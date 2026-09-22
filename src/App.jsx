@@ -5,6 +5,7 @@ import { UploadView } from "./pages/UploadView";
 import { MySongsView } from "./pages/MySongsView";
 import { AdminQueueView } from "./pages/AdminQueueView";
 import { BrowseView } from "./pages/BrowseView";
+import { PlayerDock } from "./components/PlayerDock";
 import { Button, theme } from "./components/ui";
 
 export default function App() {
@@ -12,6 +13,15 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState("browse");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [queue, setQueue] = useState([]);
+  const [playerIndex, setPlayerIndex] = useState(null);
+  const [playerExpanded, setPlayerExpanded] = useState(false);
+
+  const playSong = (songs, idx) => {
+    setQueue(songs);
+    setPlayerIndex(idx);
+    setPlayerExpanded(true);
+  };
 
   useEffect(() => {
     (async () => {
@@ -94,7 +104,19 @@ export default function App() {
       ) : tab === "admin" && isAdmin ? (
         <AdminQueueView />
       ) : (
-        <BrowseView currentUser={currentUser} />
+        <BrowseView currentUser={currentUser} onPlaySong={playSong} />
+      )}
+
+      {currentUser && playerIndex != null && (
+        <PlayerDock
+          queue={queue}
+          index={playerIndex}
+          setIndex={setPlayerIndex}
+          expanded={playerExpanded}
+          setExpanded={setPlayerExpanded}
+          currentUser={currentUser}
+          onClose={() => setPlayerIndex(null)}
+        />
       )}
     </div>
   );
