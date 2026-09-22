@@ -52,45 +52,54 @@ export function SongPlayer({ song, currentUser, onClose }) {
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "40px 16px" }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200, display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "40px 16px" }}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{ background: theme.bg, maxWidth: 520, width: "100%", borderRadius: 6, border: `1px solid ${theme.border}`, padding: 24 }}>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text }}><X size={20} /></button>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "linear-gradient(180deg, #1a1a2e 0%, #0b0b0d 60%)", maxWidth: 420, width: "100%", borderRadius: 12, border: `1px solid ${theme.border}`, padding: "24px 24px 32px", display: "flex", flexDirection: "column", alignItems: "center" }}
+      >
+        <div style={{ display: "flex", justifyContent: "flex-end", width: "100%" }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: 0.7 }}><X size={20} /></button>
         </div>
 
         <img
           src={fileUrl(song.coverArtField)}
           alt={song.title}
-          style={{ width: "100%", maxHeight: 320, objectFit: "contain", background: theme.bgRaised, borderRadius: 4 }}
+          style={{ width: "100%", maxWidth: 300, aspectRatio: "1", objectFit: "cover", background: theme.bgRaised, borderRadius: 10, boxShadow: "0 12px 30px rgba(0,0,0,0.5)" }}
         />
 
-        <div style={{ marginTop: 16, fontSize: 20, fontWeight: 700 }}>{song.title}</div>
-        <div style={{ fontSize: 13.5, opacity: 0.75, marginTop: 2 }}>{song.artistName} · {song.genre} · {song.releaseType}{song.albumName ? ` · ${song.albumName}` : ""}</div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-          <button
-            onClick={toggleLike}
-            disabled={busy}
-            style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: liked ? "#ff6b6b" : theme.text }}
-          >
-            <Heart size={18} fill={liked ? "#ff6b6b" : "none"} />
-            <span style={{ fontSize: 13 }}>{likeCount}</span>
-          </button>
+        <div style={{ marginTop: 24, textAlign: "center", width: "100%" }}>
+          <div style={{ fontSize: 21, fontWeight: 700 }}>{song.title}</div>
+          <div style={{ fontSize: 14, opacity: 0.7, marginTop: 4 }}>{song.artistName}</div>
         </div>
 
-        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 10, lineHeight: 1.6 }}>
-          Producer: {song.producer} · Songwriter: {song.songWriter}
-          {song.studio && <> · Studio: {song.studio}</>}
+        <div style={{ width: "100%", maxWidth: 300 }}>
+          <AudioPlayer src={fileUrl(song.audioField)} autoPlay size="large" />
         </div>
-        {song.description && <div style={{ fontSize: 12.5, opacity: 0.75, marginTop: 8 }}>{song.description}</div>}
 
-        <AudioPlayer src={fileUrl(song.audioField)} autoPlay />
+        <button
+          onClick={toggleLike}
+          disabled={busy}
+          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: liked ? "#ff6b6b" : theme.text, marginTop: 20 }}
+        >
+          <Heart size={20} fill={liked ? "#ff6b6b" : "none"} />
+          <span style={{ fontSize: 13 }}>{likeCount}</span>
+        </button>
 
-        <details style={{ marginTop: 14 }}>
-          <summary style={{ fontSize: 12.5, opacity: 0.75, cursor: "pointer" }}>Lyrics</summary>
-          <div style={{ fontSize: 12.5, whiteSpace: "pre-wrap", opacity: 0.85, marginTop: 8 }}>{song.lyrics}</div>
-        </details>
+        <div style={{ width: "100%", maxWidth: 300, marginTop: 24, borderTop: `1px solid ${theme.border}`, paddingTop: 16 }}>
+          <div style={{ fontSize: 12, opacity: 0.6, lineHeight: 1.7, textAlign: "center" }}>
+            {song.genre} · {song.releaseType}{song.albumName ? ` · ${song.albumName}` : ""}
+            <br />
+            Producer: {song.producer} · Songwriter: {song.songWriter}
+            {song.studio && <> · Studio: {song.studio}</>}
+          </div>
+          {song.description && <div style={{ fontSize: 12.5, opacity: 0.75, marginTop: 10, textAlign: "center" }}>{song.description}</div>}
+
+          <details style={{ marginTop: 16 }}>
+            <summary style={{ fontSize: 12.5, opacity: 0.75, cursor: "pointer", textAlign: "center", listStyle: "none" }}>Lyrics</summary>
+            <div style={{ fontSize: 12.5, whiteSpace: "pre-wrap", opacity: 0.85, marginTop: 10 }}>{song.lyrics}</div>
+          </details>
+        </div>
       </div>
     </div>
   );
