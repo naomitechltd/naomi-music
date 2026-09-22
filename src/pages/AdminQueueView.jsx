@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { tablesDB, DATABASE_ID, SONGS_TABLE_ID, Query, fileUrl } from "../lib/appwrite";
 import { Button, theme } from "../components/ui";
+import { AudioPlayer } from "../components/AudioPlayer";
 
 export function AdminQueueView() {
   const [songs, setSongs] = useState([]);
@@ -58,7 +59,7 @@ export function AdminQueueView() {
               </div>
               {s.description && <div style={{ fontSize: 12.5, opacity: 0.7, marginTop: 6 }}>{s.description}</div>}
 
-              <audio controls style={{ width: "100%", marginTop: 12 }} src={fileUrl(s.audioField)} />
+              <AudioPlayer src={fileUrl(s.audioField)} />
 
               <details style={{ marginTop: 10 }}>
                 <summary style={{ fontSize: 12, opacity: 0.7, cursor: "pointer" }}>Lyrics</summary>

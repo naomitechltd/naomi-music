@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, Heart } from "lucide-react";
 import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
 import { theme } from "../components/ui";
+import { AudioPlayer } from "../components/AudioPlayer";
 
 export function SongPlayer({ song, currentUser, onClose }) {
   const [liked, setLiked] = useState(false);
@@ -84,7 +85,7 @@ export function SongPlayer({ song, currentUser, onClose }) {
         </div>
         {song.description && <div style={{ fontSize: 12.5, opacity: 0.75, marginTop: 8 }}>{song.description}</div>}
 
-        <audio controls autoPlay style={{ width: "100%", marginTop: 16 }} src={fileUrl(song.audioField)} />
+        <AudioPlayer src={fileUrl(song.audioField)} autoPlay />
 
         <details style={{ marginTop: 14 }}>
           <summary style={{ fontSize: 12.5, opacity: 0.75, cursor: "pointer" }}>Lyrics</summary>
