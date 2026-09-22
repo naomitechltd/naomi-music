@@ -4,6 +4,7 @@ import { AuthView } from "./pages/AuthView";
 import { UploadView } from "./pages/UploadView";
 import { MySongsView } from "./pages/MySongsView";
 import { AdminQueueView } from "./pages/AdminQueueView";
+import { BrowseView } from "./pages/BrowseView";
 import { Button, theme } from "./components/ui";
 
 export default function App() {
@@ -93,9 +94,7 @@ export default function App() {
       ) : tab === "admin" && isAdmin ? (
         <AdminQueueView />
       ) : (
-        <div style={{ padding: 40 }}>
-          <p style={{ opacity: 0.6, fontSize: 13 }}>Browse page (approved songs + player) comes next.</p>
-        </div>
+        <BrowseView currentUser={currentUser} />
       )}
     </div>
   );
