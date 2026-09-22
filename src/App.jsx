@@ -6,7 +6,8 @@ import { MySongsView } from "./pages/MySongsView";
 import { AdminQueueView } from "./pages/AdminQueueView";
 import { BrowseView } from "./pages/BrowseView";
 import { PlayerDock } from "./components/PlayerDock";
-import { Button, theme } from "./components/ui";
+import { NavBar } from "./components/NavBar";
+import { theme } from "./components/ui";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -62,38 +63,12 @@ export default function App() {
 
   const isArtist = currentUser?.role === "artist";
   const isAdmin = currentUser?.role === "admin";
-  const tabStyle = (t) => ({
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontFamily: "inherit",
-    fontSize: 13,
-    color: tab === t ? theme.accent : theme.text,
-    borderBottom: tab === t ? `2px solid ${theme.accent}` : "2px solid transparent",
-    padding: "6px 2px",
-  });
 
   return (
     <div style={{ minHeight: "100vh", background: theme.bg, color: theme.text, fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ borderBottom: `1px solid ${theme.border}`, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ fontWeight: 700, fontSize: 18 }}>Naomi Music</div>
-
-        {currentUser && (
-          <div style={{ display: "flex", gap: 18 }}>
-            <button style={tabStyle("browse")} onClick={() => setTab("browse")}>Browse</button>
-            {isArtist && <button style={tabStyle("upload")} onClick={() => setTab("upload")}>Upload</button>}
-            {isArtist && <button style={tabStyle("mysongs")} onClick={() => setTab("mysongs")}>My Songs</button>}
-            {isAdmin && <button style={tabStyle("admin")} onClick={() => setTab("admin")}>Admin</button>}
-          </div>
-        )}
-
-        {currentUser && (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 13 }}>
-            <span style={{ opacity: 0.7 }}>{currentUser.name} · {currentUser.role}</span>
-            <Button variant="outline" onClick={handleLogout}>Log out</Button>
-          </div>
-        )}
-      </div>
+      {currentUser && (
+        <NavBar tab={tab} setTab={setTab} isArtist={isArtist} isAdmin={isAdmin} currentUser={currentUser} onLogout={handleLogout} />
+      )}
 
       {!currentUser ? (
         <AuthView onAuth={handleAuth} />
