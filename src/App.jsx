@@ -3,6 +3,7 @@ import { account, ID } from "./lib/appwrite";
 import { AuthView } from "./pages/AuthView";
 import { UploadView } from "./pages/UploadView";
 import { MySongsView } from "./pages/MySongsView";
+import { AdminQueueView } from "./pages/AdminQueueView";
 import { Button, theme } from "./components/ui";
 
 export default function App() {
@@ -49,6 +50,7 @@ export default function App() {
   }
 
   const isArtist = currentUser?.role === "artist";
+  const isAdmin = currentUser?.role === "admin";
   const tabStyle = (t) => ({
     background: "none",
     border: "none",
@@ -70,6 +72,7 @@ export default function App() {
             <button style={tabStyle("browse")} onClick={() => setTab("browse")}>Browse</button>
             {isArtist && <button style={tabStyle("upload")} onClick={() => setTab("upload")}>Upload</button>}
             {isArtist && <button style={tabStyle("mysongs")} onClick={() => setTab("mysongs")}>My Songs</button>}
+            {isAdmin && <button style={tabStyle("admin")} onClick={() => setTab("admin")}>Admin</button>}
           </div>
         )}
 
@@ -87,6 +90,8 @@ export default function App() {
         <UploadView currentUser={currentUser} onUploaded={() => { setRefreshKey((k) => k + 1); setTab("mysongs"); }} />
       ) : tab === "mysongs" && isArtist ? (
         <MySongsView currentUser={currentUser} refreshKey={refreshKey} />
+      ) : tab === "admin" && isAdmin ? (
+        <AdminQueueView />
       ) : (
         <div style={{ padding: 40 }}>
           <p style={{ opacity: 0.6, fontSize: 13 }}>Browse page (approved songs + player) comes next.</p>
