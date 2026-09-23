@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { account, storage, ID, BUCKET_ID } from "./lib/appwrite";
+import { account, storage, ID, BUCKET_ID, Permission, Role } from "./lib/appwrite";
+import { fetchMyRole } from "./lib/role";
+import { setRole } from "./lib/api";
 import { AuthView } from "./pages/AuthView";
 import { UploadView } from "./pages/UploadView";
 import { MySongsView } from "./pages/MySongsView";
@@ -38,8 +40,9 @@ export default function App() {
     (async () => {
       try {
         const user = await account.get();
+        const role = await fetchMyRole();
         const prefs = await account.getPrefs();
-        setCurrentUser({ ...user, role: prefs.role || "listener", avatarFileId: prefs.avatarFileId || null });
+        setCurrentUser({ ...user, role, avatarFileId: prefs.avatarFileId || null });
       } catch {
         setCurrentUser(null);
       } finally {
@@ -52,18 +55,35 @@ export default function App() {
     if (mode === "signup") {
       await account.create(ID.unique(), email, password, name);
       await account.createEmailPasswordSession(email, password);
-      let avatarFileId = null;
-      if (avatarFile) {
-        const uploaded = await storage.createFile(BUCKET_ID, ID.unique(), avatarFile);
-        avatarFileId = uploaded.$id;
+
+      // Role is assigned server-side via Appwrite Function.
+      if (role === "artist") {
+        await setRole("artist");
       }
-      await account.updatePrefs({ role, avatarFileId });
+
+      // Avatar gets file-level permissions so only this user can modify it.
+      if (avatarFile) {
+        const me = await account.get();
+        const uploaded = await storage.createFile(
+          BUCKET_ID,
+          ID.unique(),
+          avatarFile,
+          [
+            Permission.read(Role.users()),
+            Permission.update(Role.user(me.$id)),
+            Permission.delete(Role.user(me.$id)),
+          ]
+        );
+        await account.updatePrefs({ avatarFileId: uploaded.$id });
+      }
     } else {
       await account.createEmailPasswordSession(email, password);
     }
+
     const user = await account.get();
+    const resolvedRole = await fetchMyRole();
     const prefs = await account.getPrefs();
-    setCurrentUser({ ...user, role: prefs.role || "listener", avatarFileId: prefs.avatarFileId || null });
+    setCurrentUser({ ...user, role: resolvedRole, avatarFileId: prefs.avatarFileId || null });
   };
 
   const handleLogout = async () => {
@@ -76,7 +96,7 @@ export default function App() {
     return <SplashScreen phase={splashPhase} />;
   }
 
-  const isArtist = currentUser?.role === "artist";
+  const isArtist = currentUser?.role === "artist" || currentUser?.role === "admin";
   const isAdmin = currentUser?.role === "admin";
 
   return (

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import {
-  tablesDB, storage, ID, DATABASE_ID, BUCKET_ID, SONGS_TABLE_ID,
+  storage, ID, BUCKET_ID, Permission, Role,
 } from "../lib/appwrite";
+import { submitSong } from "../lib/api";
 import { Button, Field, ErrorNote, inputStyle } from "../components/ui";
 
 const GENRES = ["Afrobeats", "Amapiano", "Hip Hop", "R&B", "Pop", "Gospel", "House", "Kwaito", "Jazz", "Other"];
@@ -36,24 +37,20 @@ export function UploadView({ currentUser, onUploaded }) {
 
     setBusy(true);
     try {
-      const coverUpload = await storage.createFile(BUCKET_ID, ID.unique(), coverFile);
-      const audioUpload = await storage.createFile(BUCKET_ID, ID.unique(), audioFile);
+      const filePerms = [
+        Permission.read(Role.users()),
+        Permission.update(Role.user(currentUser.$id)),
+        Permission.delete(Role.user(currentUser.$id)),
+      ];
 
-      await tablesDB.createRow(DATABASE_ID, SONGS_TABLE_ID, ID.unique(), {
-        title,
-        artistName,
-        description,
-        studio,
-        producer,
-        songWriter,
-        releaseType,
-        albumName: releaseType === "album" ? albumName : "",
-        genre,
-        lyrics,
+      const coverUpload = await storage.createFile(BUCKET_ID, ID.unique(), coverFile, filePerms);
+      const audioUpload = await storage.createFile(BUCKET_ID, ID.unique(), audioFile, filePerms);
+
+      await submitSong({
+        title, artistName, description, studio, producer, songWriter,
+        releaseType, albumName, genre, lyrics,
         coverArtField: coverUpload.$id,
         audioField: audioUpload.$id,
-        status: "pending",
-        uploadedByEmail: currentUser.email,
       });
 
       setDone(true);
