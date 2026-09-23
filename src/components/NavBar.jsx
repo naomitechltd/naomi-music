@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Home, UploadCloud, ListMusic, ShieldCheck, User, LogOut, Menu, X } from "lucide-react";
+import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu, X } from "lucide-react";
 import { theme } from "./ui";
+import { fileUrl } from "../lib/appwrite";
 
 const PLACEHOLDER_PAGES = ["Settings", "About", "T's and C's", "Terms of Use", "Privacy Policy", "Developer"];
 
@@ -10,6 +11,7 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
 
   const items = [
     { key: "browse", label: "Home", icon: Home },
+    { key: "playlists", label: "Playlists", icon: Library },
     ...(isArtist ? [{ key: "upload", label: "Upload", icon: UploadCloud }] : []),
     ...(isArtist ? [{ key: "mysongs", label: "My Songs", icon: ListMusic }] : []),
     ...(isAdmin ? [{ key: "admin", label: "Admin", icon: ShieldCheck }] : []),
@@ -49,8 +51,12 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
           ))}
 
           <div style={{ position: "relative", marginLeft: 6 }}>
-            <button title={currentUser.name} onClick={() => setProfileOpen((v) => !v)} style={iconBtnStyle(profileOpen)}>
-              <User size={19} />
+            <button title={currentUser.name} onClick={() => setProfileOpen((v) => !v)} style={{ ...iconBtnStyle(profileOpen), padding: 2 }}>
+              {currentUser.avatarFileId ? (
+                <img src={fileUrl(currentUser.avatarFileId)} alt={currentUser.name} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", display: "block" }} />
+              ) : (
+                <User size={19} />
+              )}
             </button>
             {profileOpen && (
               <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 6, padding: 12, width: 190, boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>

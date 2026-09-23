@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X } from "lucide-react";
-import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
-import { theme } from "./ui";
+import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X, ListPlus, Plus } from "lucide-react";
+import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID, PLAYLIST_SONGS_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
+import { theme, inputStyle } from "./ui";
 
 function formatTime(sec) {
   if (!isFinite(sec) || sec < 0) return "0:00";
@@ -10,18 +10,22 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// Owns the single, never-unmounted <audio> element so playback survives
-// minimizing to the bottom bar and switching tabs elsewhere in the app.
 export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, currentUser, onClose }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [repeat, setRepeat] = useState("off"); // "off" | "one" | "all"
+  const [repeat, setRepeat] = useState("off");
   const [liked, setLiked] = useState(false);
   const [likeRowId, setLikeRowId] = useState(null);
   const [likeCount, setLikeCount] = useState(0);
   const [likeBusy, setLikeBusy] = useState(false);
+
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [myPlaylists, setMyPlaylists] = useState([]);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [addedMsg, setAddedMsg] = useState("");
 
   const song = index != null ? queue[index] : null;
 
@@ -57,6 +61,8 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
   useEffect(() => {
     if (!song || !audioRef.current) return;
     audioRef.current.play().then(() => setPlaying(true)).catch(() => {});
+    setShowAddMenu(false);
+    setAddedMsg("");
   }, [song?.$id]);
 
   useEffect(() => {
@@ -123,6 +129,51 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
       }
     } catch {}
     setLikeBusy(false);
+  };
+
+  const openAddMenu = async () => {
+    const next = !showAddMenu;
+    setShowAddMenu(next);
+    setAddedMsg("");
+    if (next && myPlaylists.length === 0) {
+      try {
+        const res = await tablesDB.listRows(DATABASE_ID, PLAYLISTS_TABLE_ID, [Query.equal("userEmail", currentUser.email)]);
+        setMyPlaylists(res.rows);
+      } catch {}
+    }
+  };
+
+  const addToPlaylist = async (playlistId) => {
+    setAddBusy(true);
+    try {
+      await tablesDB.createRow(DATABASE_ID, PLAYLIST_SONGS_TABLE_ID, ID.unique(), {
+        playlistId,
+        songId: song.$id,
+        order: Date.now(),
+      });
+      setAddedMsg("Added.");
+    } catch (e) {
+      setAddedMsg(e.message);
+    } finally {
+      setAddBusy(false);
+    }
+  };
+
+  const createAndAdd = async () => {
+    if (!newPlaylistName.trim()) return;
+    setAddBusy(true);
+    try {
+      const pl = await tablesDB.createRow(DATABASE_ID, PLAYLISTS_TABLE_ID, ID.unique(), {
+        name: newPlaylistName.trim(),
+        userEmail: currentUser.email,
+      });
+      setMyPlaylists((p) => [...p, pl]);
+      setNewPlaylistName("");
+      await addToPlaylist(pl.$id);
+    } catch (e) {
+      setAddedMsg(e.message);
+      setAddBusy(false);
+    }
   };
 
   const progress = duration ? (current / duration) * 100 : 0;
@@ -193,26 +244,59 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
                 <span>{formatTime(duration)}</span>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 22, marginTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginTop: 14 }}>
                 <button onClick={cycleRepeat} style={{ background: "none", border: "none", cursor: "pointer", color: repeat !== "off" ? theme.accent : theme.text, opacity: repeat !== "off" ? 1 : 0.6, display: "flex" }}>
-                  <RepeatIcon size={18} />
+                  <RepeatIcon size={17} />
                 </button>
                 <button onClick={prevTrack} disabled={index === 0} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: index === 0 ? 0.35 : 1, display: "flex" }}>
-                  <SkipBack size={22} fill={theme.text} />
+                  <SkipBack size={21} fill={theme.text} />
                 </button>
                 <button
                   onClick={toggle}
-                  style={{ width: 56, height: 56, borderRadius: "50%", border: "none", background: theme.accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 14px rgba(124,92,255,0.4)" }}
+                  style={{ width: 54, height: 54, borderRadius: "50%", border: "none", background: theme.accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 14px rgba(124,92,255,0.4)" }}
                 >
-                  {playing ? <Pause size={22} fill="#fff" /> : <Play size={22} fill="#fff" style={{ marginLeft: 2 }} />}
+                  {playing ? <Pause size={21} fill="#fff" /> : <Play size={21} fill="#fff" style={{ marginLeft: 2 }} />}
                 </button>
                 <button onClick={nextTrack} disabled={index === queue.length - 1 && repeat !== "all"} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: (index === queue.length - 1 && repeat !== "all") ? 0.35 : 1, display: "flex" }}>
-                  <SkipForward size={22} fill={theme.text} />
+                  <SkipForward size={21} fill={theme.text} />
                 </button>
                 <button onClick={toggleLike} disabled={likeBusy} style={{ background: "none", border: "none", cursor: "pointer", color: liked ? "#ff6b6b" : theme.text, display: "flex" }}>
-                  <Heart size={18} fill={liked ? "#ff6b6b" : "none"} />
+                  <Heart size={17} fill={liked ? "#ff6b6b" : "none"} />
+                </button>
+                <button onClick={openAddMenu} style={{ background: "none", border: "none", cursor: "pointer", color: showAddMenu ? theme.accent : theme.text, display: "flex" }}>
+                  <ListPlus size={18} />
                 </button>
               </div>
+
+              {likeCount > 0 && <div style={{ textAlign: "center", fontSize: 11, opacity: 0.5, marginTop: 6 }}>{likeCount} like{likeCount === 1 ? "" : "s"}</div>}
+
+              {showAddMenu && (
+                <div style={{ marginTop: 14, border: `1px solid ${theme.border}`, borderRadius: 6, padding: 12, background: "rgba(255,255,255,0.03)" }}>
+                  <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>Add to playlist</div>
+                  {myPlaylists.map((p) => (
+                    <button
+                      key={p.$id}
+                      onClick={() => addToPlaylist(p.$id)}
+                      disabled={addBusy}
+                      style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: theme.text, cursor: "pointer", fontSize: 13, padding: "6px 2px", fontFamily: "inherit" }}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                    <input
+                      style={{ ...inputStyle(), fontSize: 12.5, padding: "6px 8px" }}
+                      placeholder="New playlist"
+                      value={newPlaylistName}
+                      onChange={(e) => setNewPlaylistName(e.target.value)}
+                    />
+                    <button onClick={createAndAdd} disabled={addBusy} style={{ background: theme.accent, border: "none", borderRadius: 4, color: "#fff", cursor: "pointer", padding: "0 10px", display: "flex", alignItems: "center" }}>
+                      <Plus size={15} />
+                    </button>
+                  </div>
+                  {addedMsg && <div style={{ fontSize: 11.5, color: theme.accent, marginTop: 6 }}>{addedMsg}</div>}
+                </div>
+              )}
             </div>
 
             <div style={{ width: "100%", maxWidth: 280, marginTop: 22, borderTop: `1px solid ${theme.border}`, paddingTop: 14 }}>

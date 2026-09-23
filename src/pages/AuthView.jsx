@@ -7,6 +7,7 @@ export function AuthView({ onAuth }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("listener");
+  const [avatarFile, setAvatarFile] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -14,9 +15,10 @@ export function AuthView({ onAuth }) {
     setError("");
     if (!email || !password) { setError("Enter your email and password."); return; }
     if (mode === "signup" && !name) { setError("Enter your name."); return; }
+    if (mode === "signup" && !avatarFile) { setError("Please choose a profile picture."); return; }
     setBusy(true);
     try {
-      await onAuth({ mode, name, email, password, role });
+      await onAuth({ mode, name, email, password, role, avatarFile });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -37,6 +39,9 @@ export function AuthView({ onAuth }) {
         <>
           <Field label="Name">
             <input style={inputStyle()} value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="Profile picture">
+            <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} />
           </Field>
           <Field label="I am a...">
             <div style={{ display: "flex", gap: 8 }}>

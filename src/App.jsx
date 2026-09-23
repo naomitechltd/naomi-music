@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { account, ID } from "./lib/appwrite";
+import { account, storage, ID, BUCKET_ID } from "./lib/appwrite";
 import { AuthView } from "./pages/AuthView";
 import { UploadView } from "./pages/UploadView";
 import { MySongsView } from "./pages/MySongsView";
 import { AdminQueueView } from "./pages/AdminQueueView";
 import { BrowseView } from "./pages/BrowseView";
+import { PlaylistsView } from "./pages/PlaylistsView";
 import { PlayerDock } from "./components/PlayerDock";
 import { NavBar } from "./components/NavBar";
+import { SplashScreen } from "./components/SplashScreen";
 import { theme } from "./components/ui";
 
 export default function App() {
@@ -17,6 +19,8 @@ export default function App() {
   const [queue, setQueue] = useState([]);
   const [playerIndex, setPlayerIndex] = useState(null);
   const [playerExpanded, setPlayerExpanded] = useState(false);
+  const [splashPhase, setSplashPhase] = useState("logo");
+  const [splashDone, setSplashDone] = useState(false);
 
   const playSong = (songs, idx) => {
     setQueue(songs);
@@ -25,11 +29,17 @@ export default function App() {
   };
 
   useEffect(() => {
+    const t1 = setTimeout(() => setSplashPhase("slogan"), 1200);
+    const t2 = setTimeout(() => setSplashDone(true), 2200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  useEffect(() => {
     (async () => {
       try {
         const user = await account.get();
         const prefs = await account.getPrefs();
-        setCurrentUser({ ...user, role: prefs.role || "listener" });
+        setCurrentUser({ ...user, role: prefs.role || "listener", avatarFileId: prefs.avatarFileId || null });
       } catch {
         setCurrentUser(null);
       } finally {
@@ -38,17 +48,22 @@ export default function App() {
     })();
   }, []);
 
-  const handleAuth = async ({ mode, name, email, password, role }) => {
+  const handleAuth = async ({ mode, name, email, password, role, avatarFile }) => {
     if (mode === "signup") {
       await account.create(ID.unique(), email, password, name);
       await account.createEmailPasswordSession(email, password);
-      await account.updatePrefs({ role });
+      let avatarFileId = null;
+      if (avatarFile) {
+        const uploaded = await storage.createFile(BUCKET_ID, ID.unique(), avatarFile);
+        avatarFileId = uploaded.$id;
+      }
+      await account.updatePrefs({ role, avatarFileId });
     } else {
       await account.createEmailPasswordSession(email, password);
     }
     const user = await account.get();
     const prefs = await account.getPrefs();
-    setCurrentUser({ ...user, role: prefs.role || "listener" });
+    setCurrentUser({ ...user, role: prefs.role || "listener", avatarFileId: prefs.avatarFileId || null });
   };
 
   const handleLogout = async () => {
@@ -57,8 +72,8 @@ export default function App() {
     setTab("browse");
   };
 
-  if (!ready) {
-    return <div style={{ minHeight: "100vh", background: theme.bg }} />;
+  if (!ready || !splashDone) {
+    return <SplashScreen phase={splashPhase} />;
   }
 
   const isArtist = currentUser?.role === "artist";
@@ -78,6 +93,8 @@ export default function App() {
         <MySongsView currentUser={currentUser} refreshKey={refreshKey} />
       ) : tab === "admin" && isAdmin ? (
         <AdminQueueView />
+      ) : tab === "playlists" ? (
+        <PlaylistsView currentUser={currentUser} onPlaySong={playSong} />
       ) : (
         <BrowseView currentUser={currentUser} onPlaySong={playSong} />
       )}
