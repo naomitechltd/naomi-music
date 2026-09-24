@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu, X } from "lucide-react";
 import { theme } from "./ui";
 import { fileUrl } from "../lib/appwrite";
@@ -8,6 +8,36 @@ const PLACEHOLDER_PAGES = ["Settings", "About", "T's and C's", "Terms of Use", "
 export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [logoText, setLogoText] = useState("Naomi Music");
+  const [logoFading, setLogoFading] = useState(false);
+
+  // Rotate: 30s "Naomi Music" -> swap to "Home", hold 10s -> swap back. Loops.
+  useEffect(() => {
+    let cancelled = false;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    const swap = async (next) => {
+      if (cancelled) return;
+      setLogoFading(true);
+      await sleep(220);
+      if (cancelled) return;
+      setLogoText(next);
+      setLogoFading(false);
+    };
+
+    (async () => {
+      while (!cancelled) {
+        await sleep(30000);
+        if (cancelled) return;
+        await swap("Home");
+        await sleep(10000);
+        if (cancelled) return;
+        await swap("Naomi Music");
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
 
   const items = [
     { key: "browse", label: "Home", icon: Home },
@@ -39,8 +69,29 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
   return (
     <div style={{ position: "sticky", top: 0, zIndex: 100, background: theme.bg, borderBottom: `1px solid ${theme.border}` }}>
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
-        <button onClick={() => go("browse")} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, fontWeight: 700, fontSize: 16, padding: 0, fontFamily: "inherit" }}>
-          Naomi Music
+        <button
+          onClick={() => go("browse")}
+          style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, fontWeight: 700, fontSize: 16, padding: 0, fontFamily: "inherit", textAlign: "left" }}
+        >
+          <span style={{ display: "inline-grid" }}>
+            <span
+              style={{
+                gridArea: "1 / 1",
+                opacity: logoFading ? 0 : 1,
+                transform: logoFading ? "translateY(-4px)" : "translateY(0)",
+                transition: "opacity 0.22s ease, transform 0.22s ease",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {logoText}
+            </span>
+            <span
+              aria-hidden="true"
+              style={{ gridArea: "1 / 1", visibility: "hidden", pointerEvents: "none", whiteSpace: "nowrap" }}
+            >
+              Naomi Music
+            </span>
+          </span>
         </button>
 
         <div className="nm-desktop-nav" style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -62,6 +113,12 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
               <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 6, padding: 12, width: 190, boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{currentUser.name}</div>
                 <div style={{ fontSize: 11.5, opacity: 0.6, marginBottom: 10, textTransform: "capitalize" }}>{currentUser.role}</div>
+                <button
+                  onClick={() => go("profile")}
+                  style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: theme.text, cursor: "pointer", fontSize: 13, fontFamily: "inherit", padding: 0, marginBottom: 10 }}
+                >
+                  <User size={15} /> View profile
+                </button>
                 <button onClick={onLogout} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: theme.danger, cursor: "pointer", fontSize: 13, fontFamily: "inherit", padding: 0 }}>
                   <LogOut size={15} /> Log out
                 </button>
@@ -70,9 +127,24 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
           </div>
         </div>
 
-        <button className="nm-mobile-toggle" onClick={() => setMobileOpen(true)} style={{ display: "none", background: "none", border: "none", cursor: "pointer", color: theme.text }}>
-          <Menu size={22} />
-        </button>
+        <div className="nm-mobile-toggle" style={{ display: "none", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => go("profile")}
+            title="Profile"
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex" }}
+          >
+            {currentUser.avatarFileId ? (
+              <img src={fileUrl(currentUser.avatarFileId)} alt={currentUser.name} style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", border: `1px solid ${theme.border}` }} />
+            ) : (
+              <div style={{ width: 30, height: 30, borderRadius: "50%", background: theme.bgRaised, border: `1px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: theme.accent, fontWeight: 700, fontSize: 13 }}>
+                {currentUser.name?.[0]?.toUpperCase() || "?"}
+              </div>
+            )}
+          </button>
+          <button onClick={() => setMobileOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex" }}>
+            <Menu size={22} />
+          </button>
+        </div>
       </div>
 
       {mobileOpen && (
@@ -97,6 +169,13 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
         </div>
 
         <div style={{ padding: "10px 20px", display: "flex", flexDirection: "column", gap: 2 }}>
+          <button
+            onClick={() => go("profile")}
+            style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: tab === "profile" ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
+          >
+            <User size={18} /> Profile
+          </button>
+          <div style={{ borderTop: `1px solid ${theme.border}`, margin: "6px 0" }} />
           {mobileNavItems.map((it) => (
             <button
               key={it.key}

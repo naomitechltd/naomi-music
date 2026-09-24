@@ -1,7 +1,17 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X, ListPlus, Plus } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X, ListPlus, Plus, Info, Share2 } from "lucide-react";
 import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID, PLAYLIST_SONGS_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "./ui";
+
+
+function Row({ label, value }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+      <div style={{ fontSize: 11.5, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>{label}</div>
+      <div style={{ fontSize: 13.5, textAlign: "right", opacity: 0.95, wordBreak: "break-word" }}>{value}</div>
+    </div>
+  );
+}
 
 function formatTime(sec) {
   if (!isFinite(sec) || sec < 0) return "0:00";
@@ -26,6 +36,17 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [addBusy, setAddBusy] = useState(false);
   const [addedMsg, setAddedMsg] = useState("");
+
+  // Swipe state
+  const cardRef = useRef(null);
+  const dragStartX = useRef(null);
+  const dragStartY = useRef(null);
+  const [cardWidth, setCardWidth] = useState(280);
+  const [view, setView] = useState("cover"); // "cover" | "lyrics"
+  const [dragging, setDragging] = useState(false);
+  const [dragDelta, setDragDelta] = useState(0);
+  const [hintDismissed, setHintDismissed] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   const song = index != null ? queue[index] : null;
 
@@ -81,6 +102,31 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
     return () => { cancelled = true; };
   }, [song?.$id, currentUser.email]);
 
+  // Reset card to cover when the song changes
+  useEffect(() => {
+    setView("cover");
+    setDragDelta(0);
+    setDragging(false);
+    setShowAbout(false);
+    dragStartX.current = null;
+    dragStartY.current = null;
+  }, [song?.$id]);
+
+  // Measure the card so we can translate in pixels
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const measure = () => setCardWidth(el.clientWidth || 280);
+    measure();
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(measure);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [expanded]);
+
   if (!song) return null;
 
   const toggle = () => {
@@ -135,11 +181,13 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
     const next = !showAddMenu;
     setShowAddMenu(next);
     setAddedMsg("");
-    if (next && myPlaylists.length === 0) {
+    if (next) {
       try {
         const res = await tablesDB.listRows(DATABASE_ID, PLAYLISTS_TABLE_ID, [Query.equal("userEmail", currentUser.email)]);
         setMyPlaylists(res.rows);
-      } catch {}
+      } catch (e) {
+        setAddedMsg(e.message);
+      }
     }
   };
 
@@ -159,6 +207,26 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
     }
   };
 
+  const shareSong = async () => {
+    const url = window.location.origin + "/?song=" + song.$id;
+    const shareData = {
+      title: song.title,
+      text: `${song.title} by ${song.artistName} on Naomi Music`,
+      url,
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(url);
+        setAddedMsg("Link copied to clipboard.");
+        setTimeout(() => setAddedMsg(""), 2400);
+      }
+    } catch (e) {
+      // user cancelled — ignore
+    }
+  };
+
   const createAndAdd = async () => {
     if (!newPlaylistName.trim()) return;
     setAddBusy(true);
@@ -175,6 +243,60 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
       setAddBusy(false);
     }
   };
+
+  // Swipe handlers
+  const onPointerDown = (e) => {
+    const pt = e.touches ? e.touches[0] : e;
+    dragStartX.current = pt.clientX;
+    dragStartY.current = pt.clientY;
+    setDragging(true);
+    setDragDelta(0);
+  };
+
+  const onPointerMove = (e) => {
+    if (dragStartX.current == null) return;
+    const pt = e.touches ? e.touches[0] : e;
+    const dx = pt.clientX - dragStartX.current;
+    const dy = pt.clientY - dragStartY.current;
+
+    // If the user is scrolling vertically, cancel the drag
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dx) < 12) {
+      dragStartX.current = null;
+      dragStartY.current = null;
+      setDragging(false);
+      setDragDelta(0);
+      return;
+    }
+
+    if (e.cancelable) e.preventDefault();
+    setDragDelta(dx);
+  };
+
+  const onPointerUp = () => {
+    if (dragStartX.current == null) {
+      setDragging(false);
+      return;
+    }
+    const threshold = Math.min(60, cardWidth * 0.18);
+    if (view === "cover" && dragDelta < -threshold) {
+      setView("lyrics");
+      setHintDismissed(true);
+    } else if (view === "lyrics" && dragDelta > threshold) {
+      setView("cover");
+    }
+    setDragging(false);
+    setDragDelta(0);
+    dragStartX.current = null;
+    dragStartY.current = null;
+  };
+
+  // Offset: cover starts at 0; lyrics is at -cardWidth
+  let translateX;
+  if (view === "cover") {
+    translateX = Math.min(0, dragDelta);
+  } else {
+    translateX = -cardWidth + Math.max(0, dragDelta);
+  }
 
   const progress = duration ? (current / duration) * 100 : 0;
   const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
@@ -209,6 +331,63 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
         </div>
       )}
 
+      {expanded && showAbout && song && (
+        <div
+          onClick={() => setShowAbout(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 300,
+            background: "rgba(0,0,0,0.75)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "24px 16px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "linear-gradient(180deg, #1a1a2e 0%, #0b0b0d 60%)",
+              width: "100%", maxWidth: 380, maxHeight: "80vh",
+              borderRadius: 12, border: `1px solid ${theme.border}`,
+              display: "flex", flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "16px 20px", borderBottom: `1px solid ${theme.border}`,
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>About song</div>
+              <button
+                onClick={() => setShowAbout(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: 0.7, display: "flex" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: "18px 20px 22px", overflowY: "auto" }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{song.title}</div>
+              <div style={{ fontSize: 13, opacity: 0.7, marginTop: 3 }}>{song.artistName}</div>
+
+              <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                <Row label="Genre" value={song.genre} />
+                <Row label="Release type" value={song.releaseType} />
+                {song.albumName && <Row label="Album" value={song.albumName} />}
+                <Row label="Producer" value={song.producer} />
+                <Row label="Songwriter" value={song.songWriter} />
+                {song.studio && <Row label="Studio" value={song.studio} />}
+              </div>
+
+              {song.description && (
+                <div style={{ marginTop: 18 }}>
+                  <div style={{ fontSize: 11, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Description</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.6, opacity: 0.9, whiteSpace: "pre-wrap" }}>{song.description}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {expanded && (
         <div
           onClick={() => setExpanded(false)}
@@ -223,13 +402,91 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
               <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: 0.7 }}><X size={20} /></button>
             </div>
 
-            <img
-              src={fileUrl(song.coverArtField)}
-              alt={song.title}
-              style={{ width: "100%", maxWidth: 280, aspectRatio: "1", objectFit: "cover", background: theme.bgRaised, borderRadius: 10, boxShadow: "0 12px 30px rgba(0,0,0,0.5)", marginTop: 8 }}
-            />
+            {/* Swipeable cover/lyrics card */}
+            <div
+              ref={cardRef}
+              onTouchStart={onPointerDown}
+              onTouchMove={onPointerMove}
+              onTouchEnd={onPointerUp}
+              onTouchCancel={onPointerUp}
+              onMouseDown={onPointerDown}
+              onMouseMove={dragging ? onPointerMove : undefined}
+              onMouseUp={onPointerUp}
+              onMouseLeave={dragging ? onPointerUp : undefined}
+              style={{
+                width: "100%", maxWidth: 280, aspectRatio: "1",
+                marginTop: 8, position: "relative", overflow: "hidden",
+                borderRadius: 10, background: theme.bgRaised,
+                boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
+                touchAction: "pan-y",
+                cursor: "grab",
+                userSelect: "none",
+                WebkitUserSelect: "none",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  width: "200%",
+                  height: "100%",
+                  transform: `translateX(${translateX}px)`,
+                  transition: dragging ? "none" : "transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1)",
+                  willChange: "transform",
+                }}
+              >
+                {/* Panel 1: cover */}
+                <div style={{ width: "50%", height: "100%", flexShrink: 0, position: "relative" }}>
+                  <img
+                    src={fileUrl(song.coverArtField)}
+                    alt={song.title}
+                    draggable={false}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
+                  />
+                </div>
 
-            <div style={{ marginTop: 20, textAlign: "center", width: "100%" }}>
+                {/* Panel 2: lyrics */}
+                <div
+                  style={{
+                    width: "50%", height: "100%", flexShrink: 0,
+                    background: "linear-gradient(180deg, #15151a 0%, #0f0f13 100%)",
+                    padding: "18px 20px", boxSizing: "border-box",
+                    overflowY: "auto", overscrollBehavior: "contain",
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.5, marginBottom: 12, textAlign: "center" }}>
+                    Lyrics
+                  </div>
+                  <div style={{ fontSize: 14, whiteSpace: "pre-wrap", lineHeight: 1.7, opacity: 0.9, textAlign: "center", paddingBottom: 12 }}>
+                    {song.lyrics || "No lyrics for this track."}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Page dots + hint */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, height: 16 }}>
+              <div
+                style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: view === "cover" ? theme.accent : theme.border,
+                  transition: "background 0.2s",
+                }}
+              />
+              <div
+                style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: view === "lyrics" ? theme.accent : theme.border,
+                  transition: "background 0.2s",
+                }}
+              />
+              {!hintDismissed && view === "cover" && (
+                <span style={{ fontSize: 11, opacity: 0.45, marginLeft: 8 }}>
+                  Swipe for lyrics
+                </span>
+              )}
+            </div>
+
+            <div style={{ marginTop: 14, textAlign: "center", width: "100%" }}>
               <div style={{ fontSize: 20, fontWeight: 700 }}>{song.title}</div>
               <div style={{ fontSize: 13.5, opacity: 0.7, marginTop: 4 }}>{song.artistName}</div>
             </div>
@@ -263,9 +520,6 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
                 <button onClick={toggleLike} disabled={likeBusy} style={{ background: "none", border: "none", cursor: "pointer", color: liked ? "#ff6b6b" : theme.text, display: "flex" }}>
                   <Heart size={17} fill={liked ? "#ff6b6b" : "none"} />
                 </button>
-                <button onClick={openAddMenu} style={{ background: "none", border: "none", cursor: "pointer", color: showAddMenu ? theme.accent : theme.text, display: "flex" }}>
-                  <ListPlus size={18} />
-                </button>
               </div>
 
               {likeCount > 0 && <div style={{ textAlign: "center", fontSize: 11, opacity: 0.5, marginTop: 6 }}>{likeCount} like{likeCount === 1 ? "" : "s"}</div>}
@@ -273,7 +527,11 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
               {showAddMenu && (
                 <div style={{ marginTop: 14, border: `1px solid ${theme.border}`, borderRadius: 6, padding: 12, background: "rgba(255,255,255,0.03)" }}>
                   <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>Add to playlist</div>
-                  {myPlaylists.map((p) => (
+                  {myPlaylists.length === 0 ? (
+                    <div style={{ fontSize: 12.5, opacity: 0.65, marginBottom: 8, lineHeight: 1.5 }}>
+                      You don't have any playlists yet.<br />Create one below to save this song.
+                    </div>
+                  ) : myPlaylists.map((p) => (
                     <button
                       key={p.$id}
                       onClick={() => addToPlaylist(p.$id)}
@@ -299,19 +557,53 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
               )}
             </div>
 
-            <div style={{ width: "100%", maxWidth: 280, marginTop: 22, borderTop: `1px solid ${theme.border}`, paddingTop: 14 }}>
-              <div style={{ fontSize: 11.5, opacity: 0.6, lineHeight: 1.7, textAlign: "center" }}>
-                {song.genre} · {song.releaseType}{song.albumName ? ` · ${song.albumName}` : ""}
-                <br />
-                Producer: {song.producer} · Songwriter: {song.songWriter}
-                {song.studio && <> · Studio: {song.studio}</>}
-              </div>
-              {song.description && <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10, textAlign: "center" }}>{song.description}</div>}
+            <div style={{ marginTop: 22, display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                type="button"
+                onClick={openAddMenu}
+                title="Add to playlist"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "transparent", border: `1px solid ${showAddMenu ? theme.accent : theme.border}`,
+                  color: showAddMenu ? theme.accent : theme.text, opacity: showAddMenu ? 1 : 0.85,
+                  padding: "8px 16px", borderRadius: 20,
+                  cursor: "pointer", fontFamily: "inherit", fontSize: 12.5,
+                }}
+              >
+                <ListPlus size={14} />
+                Playlist
+              </button>
 
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 14, textAlign: "center", fontWeight: 600 }}>Lyrics</div>
-              <div style={{ fontSize: 12.5, whiteSpace: "pre-wrap", opacity: 0.85, marginTop: 8, maxHeight: 180, overflowY: "auto", padding: "2px 4px" }}>
-                {song.lyrics}
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowAbout(true)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "transparent", border: `1px solid ${theme.border}`,
+                  color: theme.text, opacity: 0.85,
+                  padding: "8px 16px", borderRadius: 20,
+                  cursor: "pointer", fontFamily: "inherit", fontSize: 12.5,
+                }}
+              >
+                <Info size={14} />
+                About song
+              </button>
+
+              <button
+                type="button"
+                onClick={shareSong}
+                title="Share"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "transparent", border: `1px solid ${theme.border}`,
+                  color: theme.text, opacity: 0.85,
+                  padding: "8px 16px", borderRadius: 20,
+                  cursor: "pointer", fontFamily: "inherit", fontSize: 12.5,
+                }}
+              >
+                <Share2 size={14} />
+                Share
+              </button>
             </div>
           </div>
         </div>

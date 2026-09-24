@@ -8,6 +8,7 @@ import { MySongsView } from "./pages/MySongsView";
 import { AdminQueueView } from "./pages/AdminQueueView";
 import { BrowseView } from "./pages/BrowseView";
 import { PlaylistsView } from "./pages/PlaylistsView";
+import { ProfileView } from "./pages/ProfileView";
 import { PlayerDock } from "./components/PlayerDock";
 import { NavBar } from "./components/NavBar";
 import { SplashScreen } from "./components/SplashScreen";
@@ -115,6 +116,8 @@ export default function App() {
         <AdminQueueView />
       ) : tab === "playlists" ? (
         <PlaylistsView currentUser={currentUser} onPlaySong={playSong} />
+      ) : tab === "profile" ? (
+        <ProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} onLogout={handleLogout} />
       ) : (
         <BrowseView currentUser={currentUser} onPlaySong={playSong} />
       )}
