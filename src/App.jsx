@@ -11,6 +11,7 @@ import { PlaylistsView } from "./pages/PlaylistsView";
 import { ProfileView } from "./pages/ProfileView";
 import { MessagesView } from "./pages/MessagesView";
 import { ChatView } from "./pages/ChatView";
+import { AboutPage, TermsPage, PrivacyPage, TsCsPage, DeveloperPage } from "./pages/StaticPages";
 import { PlayerDock } from "./components/PlayerDock";
 import { NavBar } from "./components/NavBar";
 import { SplashScreen } from "./components/SplashScreen";
@@ -180,6 +181,16 @@ export default function App() {
         <MessagesView currentUser={currentUser} onOpenChat={setOpenConversation} />
       ) : tab === "profile" ? (
         <ProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} onLogout={handleLogout} />
+      ) : tab === "about" ? (
+        <AboutPage />
+      ) : tab === "terms" ? (
+        <TermsPage />
+      ) : tab === "privacy" ? (
+        <PrivacyPage />
+      ) : tab === "tscs" ? (
+        <TsCsPage />
+      ) : tab === "developer" ? (
+        <DeveloperPage />
       ) : (
         <BrowseView currentUser={currentUser} onPlaySong={playSong} />
       )}

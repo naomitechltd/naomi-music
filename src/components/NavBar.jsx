@@ -3,7 +3,13 @@ import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu,
 import { theme } from "./ui";
 import { fileUrl } from "../lib/appwrite";
 
-const PLACEHOLDER_PAGES = ["Settings", "About", "T's and C's", "Terms of Use", "Privacy Policy", "Developer"];
+const LEGAL_ITEMS = [
+  { key: "about", label: "About" },
+  { key: "terms", label: "Terms of Use" },
+  { key: "privacy", label: "Privacy Policy" },
+  { key: "tscs", label: "T's and C's" },
+  { key: "developer", label: "Developer" },
+];
 
 export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -189,13 +195,13 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
 
           {mobileNavItems.length > 0 && <div style={{ borderTop: `1px solid ${theme.border}`, margin: "8px 0" }} />}
 
-          {PLACEHOLDER_PAGES.map((label) => (
+          {LEGAL_ITEMS.map((it) => (
             <button
-              key={label}
-              onClick={() => setMobileOpen(false)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: 0.75, fontSize: 13.5, padding: "9px 4px", fontFamily: "inherit", textAlign: "left" }}
+              key={it.key}
+              onClick={() => go(it.key)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: tab === it.key ? theme.accent : theme.text, opacity: 0.85, fontSize: 13.5, padding: "9px 4px", fontFamily: "inherit", textAlign: "left" }}
             >
-              {label}
+              {it.label}
             </button>
           ))}
         </div>
