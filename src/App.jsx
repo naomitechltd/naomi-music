@@ -9,6 +9,8 @@ import { AdminQueueView } from "./pages/AdminQueueView";
 import { BrowseView } from "./pages/BrowseView";
 import { PlaylistsView } from "./pages/PlaylistsView";
 import { ProfileView } from "./pages/ProfileView";
+import { MessagesView } from "./pages/MessagesView";
+import { ChatView } from "./pages/ChatView";
 import { PlayerDock } from "./components/PlayerDock";
 import { NavBar } from "./components/NavBar";
 import { SplashScreen } from "./components/SplashScreen";
@@ -24,6 +26,7 @@ export default function App() {
   const [playerExpanded, setPlayerExpanded] = useState(false);
   const [splashPhase, setSplashPhase] = useState("logo");
   const [splashDone, setSplashDone] = useState(false);
+  const [openConversation, setOpenConversation] = useState(null);
 
   const playSong = (songs, idx) => {
     setQueue(songs);
@@ -89,6 +92,7 @@ export default function App() {
 
   const handleLogout = async () => {
     await account.deleteSession("current");
+    setOpenConversation(null);
     setCurrentUser(null);
     setTab("browse");
   };
@@ -116,6 +120,14 @@ export default function App() {
         <AdminQueueView />
       ) : tab === "playlists" ? (
         <PlaylistsView currentUser={currentUser} onPlaySong={playSong} />
+      ) : tab === "messages" && openConversation ? (
+        <ChatView
+          conversation={openConversation}
+          currentUser={currentUser}
+          onBack={() => setOpenConversation(null)}
+        />
+      ) : tab === "messages" ? (
+        <MessagesView currentUser={currentUser} onOpenChat={setOpenConversation} />
       ) : tab === "profile" ? (
         <ProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} onLogout={handleLogout} />
       ) : (

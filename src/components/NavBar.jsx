@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu, X } from "lucide-react";
+import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu, X, MessageSquare } from "lucide-react";
 import { theme } from "./ui";
 import { fileUrl } from "../lib/appwrite";
 
@@ -42,6 +42,7 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
   const items = [
     { key: "browse", label: "Home", icon: Home },
     { key: "playlists", label: "Playlists", icon: Library },
+    { key: "messages", label: "Messages", icon: MessageSquare },
     ...(isArtist ? [{ key: "upload", label: "Upload", icon: UploadCloud }] : []),
     ...(isArtist ? [{ key: "mysongs", label: "My Songs", icon: ListMusic }] : []),
     ...(isAdmin ? [{ key: "admin", label: "Admin", icon: ShieldCheck }] : []),
