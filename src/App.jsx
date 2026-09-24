@@ -40,6 +40,49 @@ export default function App() {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
+  // Handle Appwrite email callbacks: verification AND password recovery
+  // Both come as ?userId=...&secret=...
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get("userId");
+    const secret = params.get("secret");
+    if (!uid || !secret) return;
+
+    // Heuristic: verification links usually carry an extra marker; if not,
+    // try verification first; on failure, fall through to recovery.
+    let handled = false;
+    (async () => {
+      try {
+        await account.updateVerification(uid, secret);
+        handled = true;
+        window.history.replaceState({}, "", window.location.pathname);
+        alert("Email verified — you can now upload songs.");
+      } catch (errVerify) {
+        // Not a verification secret — try recovery
+        const p1 = window.prompt("Enter your new password (min 8 characters):");
+        if (!p1) {
+          window.history.replaceState({}, "", window.location.pathname);
+          return;
+        }
+        if (p1.length < 8) {
+          alert("Password must be at least 8 characters.");
+          window.history.replaceState({}, "", window.location.pathname);
+          return;
+        }
+        try {
+          await account.updateRecovery(uid, secret, p1);
+          handled = true;
+          window.history.replaceState({}, "", window.location.pathname);
+          alert("Password updated — log in with your new password.");
+        } catch (errRecover) {
+          window.history.replaceState({}, "", window.location.pathname);
+          alert("Link could not be processed: " + errRecover.message);
+        }
+      }
+      return handled;
+    })();
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -60,12 +103,19 @@ export default function App() {
       await account.create(ID.unique(), email, password, name);
       await account.createEmailPasswordSession(email, password);
 
-      // Role is assigned server-side via Appwrite Function.
+      // Fire verification email — but don't block signup if it fails
+      try {
+        await account.createVerification(`${window.location.origin}/`);
+      } catch (err) {
+        console.warn("createVerification failed:", err.message);
+      }
+
+      // Role assigned server-side
       if (role === "artist") {
         await setRole("artist");
       }
 
-      // Avatar gets file-level permissions so only this user can modify it.
+      // Avatar with per-file permissions
       if (avatarFile) {
         const me = await account.get();
         const uploaded = await storage.createFile(

@@ -77,6 +77,24 @@ export function AuthView({ onAuth }) {
       <Field label="Password">
         <input type="password" style={inputStyle()} value={password} onChange={(e) => setPassword(e.target.value)} />
       </Field>
+      {mode === "login" && (
+        <div style={{ marginTop: -6, marginBottom: 12, textAlign: "right" }}>
+          <button
+            onClick={async () => {
+              if (!email) { setError("Enter your email first."); return; }
+              try {
+                const { account } = await import("../lib/appwrite");
+                await account.createRecovery(email, `${window.location.origin}/`);
+                setError("");
+                alert("Recovery email sent — check your inbox.");
+              } catch (e) { setError(e.message); }
+            }}
+            style={{ background: "none", border: "none", color: "#7c5cff", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5 }}
+          >
+            Forgot password?
+          </button>
+        </div>
+      )}
 
       <ErrorNote message={error} />
 

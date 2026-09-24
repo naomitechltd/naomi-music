@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X, ListPlus, Plus, Info, Share2 } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X, ListPlus, Plus, Info, Share2, MessageSquare } from "lucide-react";
 import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID, PLAYLIST_SONGS_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "./ui";
+import { requestMessage } from "../lib/api";
 
 
 function Row({ label, value }) {
@@ -47,6 +48,8 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
   const [dragDelta, setDragDelta] = useState(0);
   const [hintDismissed, setHintDismissed] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [msgBusy, setMsgBusy] = useState(false);
+  const [msgNote, setMsgNote] = useState("");
 
   const song = index != null ? queue[index] : null;
 
@@ -204,6 +207,35 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
       setAddedMsg(e.message);
     } finally {
       setAddBusy(false);
+    }
+  };
+
+  const messageArtist = async () => {
+    if (msgBusy) return;
+    const artistUserId = song.uploadedByUserId;
+    if (!artistUserId) { setMsgNote("Artist not reachable."); return; }
+    if (artistUserId === currentUser.$id) { setMsgNote("This is your song."); return; }
+    setMsgBusy(true);
+    setMsgNote("");
+    try {
+      const out = await requestMessage({
+        toUserId: artistUserId,
+        toName: song.artistName,
+        toEmail: song.uploadedByEmail || "",
+        intro: "",
+      });
+      if (out.note === "conversation exists" || out.note === "already approved") {
+        setMsgNote("Open Messages to continue.");
+      } else {
+        setMsgNote("Request sent.");
+      }
+    } catch (e) {
+      if (e.code === "email-not-verified") setMsgNote("Verify your email first.");
+      else if (e.code === "cooldown") setMsgNote("Try again in a few days.");
+      else setMsgNote(e.message);
+    } finally {
+      setMsgBusy(false);
+      setTimeout(() => setMsgNote(""), 3000);
     }
   };
 
@@ -572,6 +604,23 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
               >
                 <ListPlus size={14} />
                 Playlist
+              </button>
+
+              <button
+                type="button"
+                onClick={messageArtist}
+                disabled={msgBusy}
+                title="Message artist"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "transparent", border: `1px solid ${theme.border}`,
+                  color: theme.text, opacity: msgBusy ? 0.5 : 0.85,
+                  padding: "8px 16px", borderRadius: 20,
+                  cursor: msgBusy ? "wait" : "pointer", fontFamily: "inherit", fontSize: 12.5,
+                }}
+              >
+                <MessageSquare size={14} />
+                Message
               </button>
 
               <button
