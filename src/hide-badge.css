@@ -1,0 +1,10 @@
+/* Hide Netlify free-tier badge */
+#netlify-badge,
+.netlify-badge,
+iframe[src*="netlify.com"],
+a[href*="app.netlify.com"][target="_blank"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

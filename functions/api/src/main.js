@@ -8,24 +8,24 @@ function appwriteClient() {
 }
 
 async function getRole(teams, userId) {
-  const admins = await teams.listMemberships("admins");
+  const admins = await teams.listMemberships(process.env.ADMINS_TEAM_ID);
   if (admins.memberships.some((m) => m.userId === userId)) return "admin";
-  const artists = await teams.listMemberships("artists");
+  const artists = await teams.listMemberships(process.env.ARTISTS_TEAM_ID);
   if (artists.memberships.some((m) => m.userId === userId)) return "artist";
   return "listener";
 }
 
 async function setRole(teams, userId, newRole) {
   if (newRole !== "artist" && newRole !== "listener") return { error: "invalid role", code: 400 };
-  const admins = await teams.listMemberships("admins");
+  const admins = await teams.listMemberships(process.env.ADMINS_TEAM_ID);
   if (admins.memberships.some((m) => m.userId === userId)) return { ok: true, note: "already admin" };
-  const artists = await teams.listMemberships("artists");
+  const artists = await teams.listMemberships(process.env.ARTISTS_TEAM_ID);
   const existing = artists.memberships.find((m) => m.userId === userId) || null;
   if (newRole === "artist") {
     if (existing) return { ok: true, note: "already artist" };
-    await teams.createMembership("artists", ["none"], undefined, userId);
+    await teams.createMembership(process.env.ARTISTS_TEAM_ID, ["none"], "", userId);
   } else if (existing) {
-    await teams.deleteMembership("artists", existing.$id);
+    await teams.deleteMembership(process.env.ARTISTS_TEAM_ID, existing.$id);
   }
   return { ok: true };
 }
