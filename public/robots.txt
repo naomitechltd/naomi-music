@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /upload
+
+Sitemap: https://naomimusicrsa.co.za/sitemap.xml
