@@ -73,14 +73,14 @@ async function requestMessage(db, users, teams, userId, body) {
   if (intro.length > 500) return { error: "intro too long", code: 400 };
 
   const me = await users.get(userId);
-  if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
+  if (!me.emailVerification) return { error: "email-not-verified", code: 403, debug: { stage: "email-check", userId, email: me.email } };
 
   const myRole = await getRole(teams, userId);
   const theirRole = await getRole(teams, toUserId);
   const listenerToArtist = myRole !== "artist" && myRole !== "admin" && (theirRole === "artist" || theirRole === "admin");
   const artistToArtist = (myRole === "artist" || myRole === "admin") && (theirRole === "artist" || theirRole === "admin");
   if (!listenerToArtist && !artistToArtist) {
-    return { error: "not allowed", code: 403 };
+    return { error: "not allowed", code: 403, debug: { stage: "role-check", myRole, theirRole, userId, toUserId } };
   }
 
   // Already a conversation?
@@ -227,6 +227,31 @@ async function markConversationRead(db, userId, body) {
   return { ok: true };
 }
 
+
+async function listArtists(teams, users, userId) {
+  const artists = await teams.listMemberships(process.env.ARTISTS_TEAM_ID);
+  const admins = await teams.listMemberships(process.env.ADMINS_TEAM_ID);
+  const seen = new Set();
+  const out = [];
+  for (const m of artists.memberships) {
+    if (m.userId === userId || seen.has(m.userId)) continue;
+    seen.add(m.userId);
+    try {
+      const u = await users.get(m.userId);
+      out.push({ userId: u.$id, name: u.name || u.email, email: u.email, role: "artist" });
+    } catch {}
+  }
+  for (const m of admins.memberships) {
+    if (m.userId === userId || seen.has(m.userId)) continue;
+    seen.add(m.userId);
+    try {
+      const u = await users.get(m.userId);
+      out.push({ userId: u.$id, name: u.name || u.email, email: u.email, role: "admin" });
+    } catch {}
+  }
+  return { ok: true, artists: out };
+}
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -268,6 +293,7 @@ export default async ({ req, res, log, error }) => {
     if (action === "set-role") { const out = await setRole(teams, userId, body.role); return res.json(out, out.code || 200); }
     if (action === "submit-song") { const out = await submitSong(db, users, userId, userEmail, body); return res.json(out, out.code || 200); }
 
+    if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "request-message") { const out = await requestMessage(db, users, teams, userId, body); return res.json(out, out.code || 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }
     if (action === "respond-request") { const out = await respondRequest(db, teams, userId, body); return res.json(out, out.code || 200); }
