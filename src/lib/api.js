@@ -6,7 +6,12 @@ async function call(action, payload = {}) {
     JSON.stringify({ action, ...payload }),
     false
   );
-  const raw = res.responseBody || res.response || "{}";
+  const raw =
+    res?.responseBody ??
+    res?.response ??
+    res?.data?.responseBody ??
+    res?.data?.response ??
+    "{}";
   let out = {};
   try { out = JSON.parse(raw); } catch {}
   if (out.error) {
@@ -19,7 +24,6 @@ async function call(action, payload = {}) {
 
 export const setRole = (role) => call("set-role", { role });
 export const submitSong = (song) => call("submit-song", song);
-
 export const requestMessage = (payload) => call("request-message", payload);
 export const listRequests = () => call("list-requests");
 export const respondRequest = (requestId, decision) => call("respond-request", { requestId, decision });
