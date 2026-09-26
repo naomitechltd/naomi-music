@@ -7,11 +7,13 @@ export async function fetchMyRole() {
       JSON.stringify({ action: "get-role" }),
       false
     );
-    // Appwrite Web SDK v21+ uses `responseBody`, older versions use `response`.
     const raw = res.responseBody || res.response || "{}";
+    // Expose for on-screen debug
+    try { window.__lastRoleRaw = raw; } catch {}
     const { role } = JSON.parse(raw);
     return role || "listener";
-  } catch {
+  } catch (e) {
+    try { window.__lastRoleRaw = "ERROR: " + e.message; } catch {}
     return "listener";
   }
 }

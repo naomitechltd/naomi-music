@@ -159,6 +159,12 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
       </div>
 
       {error && <div style={{ marginTop: 12 }}><ErrorNote message={error} /></div>}
+      {/* DEBUG_ROLE_BOX */}
+      <div style={{ marginTop: 12, padding: 10, background: "#2a0a0a", border: "1px solid #ff6b6b", borderRadius: 6, fontSize: 11, fontFamily: "monospace", wordBreak: "break-all", color: "#ff9999", maxHeight: 200, overflowY: "auto" }}>
+        <div>role={JSON.stringify(currentUser?.role)}</div>
+        <div>uid={currentUser?.$id}</div>
+        <div>raw={typeof window !== "undefined" ? String(window.__lastRoleRaw || "(none)").slice(0, 400) : ""}</div>
+      </div>
       {success && <div style={{ color: "#4be88a", fontSize: 12.5, marginTop: 12 }}>{success}</div>}
 
       {/* Stats */}

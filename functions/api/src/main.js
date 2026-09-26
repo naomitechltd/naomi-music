@@ -1,4 +1,4 @@
-import { Client, Teams, Databases, Users, Storage } from "node-appwrite";
+import { Client, Teams, TablesDB, Users, Storage } from "node-appwrite";
 
 function appwriteClient() {
   return new Client()
@@ -241,7 +241,7 @@ export default async ({ req, res, log, error }) => {
 
   const client = appwriteClient();
   const teams = new Teams(client);
-  const db = new Databases(client);
+  const db = new TablesDB(client);
   const users = new Users(client);
 
   try {
