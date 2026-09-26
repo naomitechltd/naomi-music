@@ -106,10 +106,13 @@ export function MessagesView({ currentUser, onOpenChat }) {
 
       {!loading && pendingOutgoing.length > 0 && (
         <Section title="Sent requests">
+          <div style={{ fontSize: 11.5, opacity: 0.55, marginBottom: 8 }}>
+            Waiting for the other person to accept.
+          </div>
           {pendingOutgoing.map((r) => (
             <div key={r.$id} style={{ border: `1px solid ${theme.border}`, borderRadius: 6, padding: 12, marginBottom: 8, opacity: 0.75 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600 }}>{r.toName || r.toEmail}</div>
-              <div style={{ fontSize: 11.5, opacity: 0.6, marginTop: 2 }}>Waiting for approval…</div>
+              <div style={{ fontSize: 11.5, opacity: 0.6, marginTop: 2 }}>Awaiting approval</div>
             </div>
           ))}
         </Section>

@@ -1,4 +1,4 @@
-import { Client, Teams, TablesDB, Users, Storage } from "node-appwrite";
+import { Client, Teams, TablesDB, Users, Storage, Query } from "node-appwrite";
 
 function appwriteClient() {
   return new Client()
@@ -85,15 +85,15 @@ async function requestMessage(db, users, teams, userId, body) {
 
   // Already a conversation?
   const convRes = await db.listRows(process.env.DATABASE_ID, process.env.CONVERSATIONS_TABLE_ID, [
-    `contains("participants", ["${userId}"])`,
+    Query.contains("participants", [userId]),
   ]).catch(() => ({ rows: [] }));
   const hasConv = convRes.rows.some((c) => c.participants?.includes(toUserId));
   if (hasConv) return { ok: true, note: "conversation exists" };
 
   // Existing request?
   const existing = await db.listRows(process.env.DATABASE_ID, process.env.REQUESTS_TABLE_ID, [
-    `equal("fromUserId", ["${userId}"])`,
-    `equal("toUserId", ["${toUserId}"])`,
+    Query.equal("fromUserId", [userId]),
+    Query.equal("toUserId", [toUserId]),
   ]).catch(() => ({ rows: [] }));
   const prior = existing.rows[0];
   if (prior) {
@@ -111,8 +111,6 @@ async function requestMessage(db, users, teams, userId, body) {
     toUserId,
     fromName: me.name || "",
     toName: toName || toUser?.name || "",
-    fromEmail: me.email || "",
-    toEmail: toEmail || toUser?.email || "",
     status: "pending",
     intro: intro || "",
   });
@@ -121,10 +119,10 @@ async function requestMessage(db, users, teams, userId, body) {
 
 async function listRequests(db, userId) {
   const incoming = await db.listRows(process.env.DATABASE_ID, process.env.REQUESTS_TABLE_ID, [
-    `equal("toUserId", ["${userId}"])`,
+    Query.equal("toUserId", [userId]),
   ]).catch(() => ({ rows: [] }));
   const outgoing = await db.listRows(process.env.DATABASE_ID, process.env.REQUESTS_TABLE_ID, [
-    `equal("fromUserId", ["${userId}"])`,
+    Query.equal("fromUserId", [userId]),
   ]).catch(() => ({ rows: [] }));
   return { ok: true, incoming: incoming.rows, outgoing: outgoing.rows };
 }
@@ -163,8 +161,8 @@ async function respondRequest(db, teams, userId, body) {
 
 async function listConversations(db, userId) {
   const res = await db.listRows(process.env.DATABASE_ID, process.env.CONVERSATIONS_TABLE_ID, [
-    `contains("participants", ["${userId}"])`,
-    `orderDesc("lastMessageAt")`,
+    Query.contains("participants", [userId]),
+    Query.orderDesc("lastMessageAt"),
   ]).catch(() => ({ rows: [] }));
   return { ok: true, conversations: res.rows };
 }
@@ -175,9 +173,9 @@ async function listMessages(db, userId, body) {
   const conv = await db.getRow(process.env.DATABASE_ID, process.env.CONVERSATIONS_TABLE_ID, conversationId);
   if (!conv.participants?.includes(userId)) return { error: "forbidden", code: 403 };
   const res = await db.listRows(process.env.DATABASE_ID, process.env.MESSAGES_TABLE_ID, [
-    `equal("conversationId", ["${conversationId}"])`,
-    `orderAsc("${'$'}createdAt")`,
-    `limit(100)`,
+    Query.equal("conversationId", [conversationId]),
+    Query.orderAsc("$createdAt"),
+    Query.limit(100),
   ]);
   return { ok: true, messages: res.rows, conversation: conv };
 }
