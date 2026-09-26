@@ -7,9 +7,15 @@ export async function fetchMyRole() {
       JSON.stringify({ action: "get-role" }),
       false
     );
+    // Debug: expose all response fields
+    try {
+      window.__roleKeys = Object.keys(res || {});
+      window.__roleResJson = JSON.stringify(res || {});
+    } catch {}
+
     const raw = res.responseBody || res.response || "{}";
-    // Expose for on-screen debug
     try { window.__lastRoleRaw = raw; } catch {}
+
     const { role } = JSON.parse(raw);
     return role || "listener";
   } catch (e) {
