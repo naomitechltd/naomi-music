@@ -6,8 +6,9 @@ async function call(action, payload = {}) {
     JSON.stringify({ action, ...payload }),
     false
   );
+  const raw = res.responseBody || res.response || "{}";
   let out = {};
-  try { out = JSON.parse(res.response || "{}"); } catch {}
+  try { out = JSON.parse(raw); } catch {}
   if (out.error) {
     const err = new Error(out.error);
     err.code = out.error;

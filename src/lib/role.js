@@ -1,6 +1,5 @@
 import { functions } from "./appwrite";
 
-// Resolved server-side via the `api` function.
 export async function fetchMyRole() {
   try {
     const res = await functions.createExecution(
@@ -8,7 +7,9 @@ export async function fetchMyRole() {
       JSON.stringify({ action: "get-role" }),
       false
     );
-    const { role } = JSON.parse(res.response || "{}");
+    // Appwrite Web SDK v21+ uses `responseBody`, older versions use `response`.
+    const raw = res.responseBody || res.response || "{}";
+    const { role } = JSON.parse(raw);
     return role || "listener";
   } catch {
     return "listener";

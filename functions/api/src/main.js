@@ -8,10 +8,16 @@ function appwriteClient() {
 }
 
 async function getRole(teams, userId) {
+  console.log("[debug] getRole called userId=" + userId);
   const admins = await teams.listMemberships(process.env.ADMINS_TEAM_ID);
-  if (admins.memberships.some((m) => m.userId === userId)) return "admin";
+  console.log("[debug] admins team size=" + admins.memberships.length + " ids=" + admins.memberships.map((m) => m.userId).join("|"));
+  if (admins.memberships.some((m) => m.userId === userId)) { console.log("[debug] matched admin"); return "admin"; }
+
   const artists = await teams.listMemberships(process.env.ARTISTS_TEAM_ID);
-  if (artists.memberships.some((m) => m.userId === userId)) return "artist";
+  console.log("[debug] artists team size=" + artists.memberships.length + " ids=" + artists.memberships.map((m) => m.userId).join("|"));
+  if (artists.memberships.some((m) => m.userId === userId)) { console.log("[debug] matched artist"); return "artist"; }
+
+  console.log("[debug] no match, returning listener");
   return "listener";
 }
 
@@ -23,7 +29,7 @@ async function setRole(teams, userId, newRole) {
   const existing = artists.memberships.find((m) => m.userId === userId) || null;
   if (newRole === "artist") {
     if (existing) return { ok: true, note: "already artist" };
-    await teams.createMembership(process.env.ARTISTS_TEAM_ID, ["none"], "", userId);
+    await teams.createMembership(process.env.ARTISTS_TEAM_ID, ["none"], undefined, userId);
   } else if (existing) {
     await teams.deleteMembership(process.env.ARTISTS_TEAM_ID, existing.$id);
   }
@@ -239,7 +245,26 @@ export default async ({ req, res, log, error }) => {
   const users = new Users(client);
 
   try {
-    if (action === "get-role") return res.json({ role: userId ? await getRole(teams, userId) : "listener" }, 200);
+    if (action === "get-role") {
+      const debug = {
+        headerUserId: userId || null,
+        headerEmail: userEmail || null,
+        artistsTeamId: process.env.ARTISTS_TEAM_ID || null,
+        adminsTeamId: process.env.ADMINS_TEAM_ID || null,
+      };
+      try {
+        const a = await teams.listMemberships(process.env.ARTISTS_TEAM_ID);
+        debug.artistCount = a.memberships.length;
+        debug.artistIds = a.memberships.map((m) => m.userId);
+      } catch (e) { debug.artistsError = e.message; }
+      try {
+        const ad = await teams.listMemberships(process.env.ADMINS_TEAM_ID);
+        debug.adminCount = ad.memberships.length;
+        debug.adminIds = ad.memberships.map((m) => m.userId);
+      } catch (e) { debug.adminsError = e.message; }
+      const role = userId ? await getRole(teams, userId) : "listener";
+      return res.json({ role, debug }, 200);
+    }
     if (action === "set-role") { const out = await setRole(teams, userId, body.role); return res.json(out, out.code || 200); }
     if (action === "submit-song") { const out = await submitSong(db, users, userId, userEmail, body); return res.json(out, out.code || 200); }
 
