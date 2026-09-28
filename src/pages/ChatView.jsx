@@ -134,9 +134,9 @@ export function ChatView({ conversation, currentUser, onBack }) {
                 }}
               >
                 {m.body && <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>}
-                {m.attachmentFileId && (
+                {m.attachmentField && (
                   <a
-                    href={fileUrl(m.attachmentFileId)}
+                    href={fileUrl(m.attachmentField)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ display: "inline-flex", alignItems: "center", gap: 6, color: mine ? "#fff" : theme.accent, fontSize: 12.5, marginTop: m.body ? 6 : 0, textDecoration: "underline" }}

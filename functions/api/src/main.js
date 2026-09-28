@@ -196,7 +196,7 @@ async function sendMessage(db, userId, body) {
     conversationId,
     senderUserId: userId,
     body: text.trim(),
-    attachmentFileId: attachmentFileId || "",
+    attachmentField: attachmentFileId || "",
     attachmentName: attachmentName || "",
     attachmentMime: attachmentMime || "",
   });
