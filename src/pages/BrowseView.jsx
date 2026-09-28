@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Search } from "lucide-react";
+import { Link } from "react-router-dom";
 import { tablesDB, DATABASE_ID, SONGS_TABLE_ID, Query, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "../components/ui";
 
@@ -49,7 +50,12 @@ export function BrowseView({ currentUser, onPlaySong }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px,1fr))", gap: 18 }}>
         {filtered.map((s, i) => (
-          <div key={s.$id} onClick={() => onPlaySong(filtered, i)} style={{ cursor: "pointer" }}>
+          <Link
+            key={s.$id}
+            to={`/song/${s.$id}`}
+            onClick={(e) => { e.preventDefault(); onPlaySong(filtered, i); }}
+            style={{ textDecoration: "none", color: "inherit", display: "block" }}
+          >
             <img
               src={fileUrl(s.coverArtField)}
               alt={s.title}
@@ -57,7 +63,7 @@ export function BrowseView({ currentUser, onPlaySong }) {
             />
             <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 8 }}>{s.title}</div>
             <div style={{ fontSize: 12, opacity: 0.6 }}>{s.artistName}</div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
