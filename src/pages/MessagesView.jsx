@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Check, X, MessageSquare, ChevronRight, Plus, Search } from "lucide-react";
-import { listRequests, listConversations, respondRequest, requestMessage } from "../lib/api";
+import { ChevronRight, Plus, Search, X } from "lucide-react";
+import { listConversations, openConversation } from "../lib/api";
 import { functions } from "../lib/appwrite";
-import { theme, Button, inputStyle } from "../components/ui";
+import { theme, inputStyle } from "../components/ui";
 
 async function listArtists() {
   const res = await functions.createExecution(
@@ -20,10 +20,8 @@ async function listArtists() {
 }
 
 export function MessagesView({ currentUser, onOpenChat }) {
-  const [requests, setRequests] = useState({ incoming: [], outgoing: [] });
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
 
@@ -31,9 +29,8 @@ export function MessagesView({ currentUser, onOpenChat }) {
     setLoading(true);
     setError("");
     try {
-      const [reqRes, convRes] = await Promise.all([listRequests(), listConversations()]);
-      setRequests({ incoming: reqRes.incoming || [], outgoing: reqRes.outgoing || [] });
-      setConversations(convRes.conversations || []);
+      const res = await listConversations();
+      setConversations(res.conversations || []);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -42,21 +39,6 @@ export function MessagesView({ currentUser, onOpenChat }) {
   };
 
   useEffect(() => { load(); }, []);
-
-  const decide = async (requestId, decision) => {
-    setBusyId(requestId);
-    try {
-      await respondRequest(requestId, decision);
-      await load();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const pendingIncoming = useMemo(() => requests.incoming.filter((r) => r.status === "pending"), [requests.incoming]);
-  const pendingOutgoing = useMemo(() => requests.outgoing.filter((r) => r.status === "pending"), [requests.outgoing]);
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", padding: "40px 20px 100px" }}>
@@ -80,48 +62,11 @@ export function MessagesView({ currentUser, onOpenChat }) {
       {error && <div style={{ color: theme.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
       {loading && <div style={{ opacity: 0.6, fontSize: 13 }}>Loading...</div>}
 
-      {!loading && pendingIncoming.length > 0 && (
-        <Section title="Requests">
-          {pendingIncoming.map((r) => (
-            <div key={r.$id} style={{ border: `1px solid ${theme.border}`, borderRadius: 6, padding: 14, marginBottom: 8 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{r.fromName || r.fromEmail}</div>
-              <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>{r.fromEmail}</div>
-              {r.intro && (
-                <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 8, lineHeight: 1.5, padding: "8px 10px", background: theme.bgRaised, borderRadius: 4, whiteSpace: "pre-wrap" }}>
-                  {r.intro}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <Button onClick={() => decide(r.$id, "approve")} disabled={busyId === r.$id}>
-                  <Check size={14} /> Approve
-                </Button>
-                <Button variant="outline" onClick={() => decide(r.$id, "decline")} disabled={busyId === r.$id}>
-                  <X size={14} /> Decline
-                </Button>
-              </div>
-            </div>
-          ))}
-        </Section>
+      {!loading && conversations.length === 0 && (
+        <div style={{ opacity: 0.6, fontSize: 13 }}>No conversations yet. Tap + to start one.</div>
       )}
 
-      {!loading && pendingOutgoing.length > 0 && (
-        <Section title="Sent requests">
-          <div style={{ fontSize: 11.5, opacity: 0.55, marginBottom: 8 }}>
-            Waiting for the other person to accept.
-          </div>
-          {pendingOutgoing.map((r) => (
-            <div key={r.$id} style={{ border: `1px solid ${theme.border}`, borderRadius: 6, padding: 12, marginBottom: 8, opacity: 0.75 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{r.toName || r.toEmail}</div>
-              <div style={{ fontSize: 11.5, opacity: 0.6, marginTop: 2 }}>Awaiting approval</div>
-            </div>
-          ))}
-        </Section>
-      )}
-
-      <Section title="Conversations">
-        {!loading && conversations.length === 0 && (
-          <div style={{ opacity: 0.6, fontSize: 13 }}>No conversations yet. Tap + to start one.</div>
-        )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {conversations.map((c) => {
           const otherIdx = c.participants[0] === currentUser.$id ? 1 : 0;
           const otherName = c.userNames?.[otherIdx] || "Unknown";
@@ -134,7 +79,7 @@ export function MessagesView({ currentUser, onOpenChat }) {
                 width: "100%", display: "flex", alignItems: "center", gap: 12,
                 border: `1px solid ${theme.border}`, borderRadius: 6, padding: 12,
                 background: "none", cursor: "pointer", color: theme.text,
-                fontFamily: "inherit", textAlign: "left", marginBottom: 8,
+                fontFamily: "inherit", textAlign: "left",
               }}
             >
               <div style={{ width: 40, height: 40, borderRadius: "50%", background: theme.bgRaised, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: 700, color: theme.accent }}>
@@ -150,52 +95,51 @@ export function MessagesView({ currentUser, onOpenChat }) {
                   )}
                 </div>
                 <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {c.lastMessage || "No messages yet"}
+                  {c.lastMessage || "No messages yet — say hi"}
                 </div>
               </div>
               <ChevronRight size={16} style={{ opacity: 0.4, flexShrink: 0 }} />
             </button>
           );
         })}
-      </Section>
+      </div>
 
       {showAdd && (
-        <AddArtistModal
-          currentUser={currentUser}
+        <AddPersonModal
           onClose={() => setShowAdd(false)}
-          onSent={() => { setShowAdd(false); load(); }}
+          onPicked={async (person) => {
+            try {
+              const out = await openConversation(person.userId);
+              if (out?.conversation) {
+                setShowAdd(false);
+                onOpenChat(out.conversation);
+              } else {
+                setError(out?.error || "Could not open chat");
+              }
+            } catch (e) {
+              setError(e.message);
+            }
+          }}
         />
       )}
     </div>
   );
 }
 
-function Section({ title, children }) {
-  return (
-    <div style={{ marginBottom: 26 }}>
-      <div style={{ fontSize: 11, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 10 }}>
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function AddArtistModal({ currentUser, onClose, onSent }) {
-  const [artists, setArtists] = useState([]);
+function AddPersonModal({ onClose, onPicked }) {
+  const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
-  const [successId, setSuccessId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     listArtists()
       .then((res) => {
         if (cancelled) return;
-        if (res.ok) setArtists(res.artists || []);
-        else setError(res.error || "Could not load artists");
+        if (res.ok) setPeople(res.artists || []);
+        else setError(res.error || "Could not load people");
       })
       .catch((e) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -204,35 +148,20 @@ function AddArtistModal({ currentUser, onClose, onSent }) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return artists;
-    return artists.filter((a) =>
-      (a.name || "").toLowerCase().includes(q) ||
-      (a.email || "").toLowerCase().includes(q)
+    if (!q) return people;
+    return people.filter((p) =>
+      (p.name || "").toLowerCase().includes(q) ||
+      (p.email || "").toLowerCase().includes(q)
     );
-  }, [artists, query]);
+  }, [people, query]);
 
-  const send = async (artist) => {
-    setBusyId(artist.userId);
+  const pick = async (person) => {
+    setBusyId(person.userId);
     setError("");
     try {
-      const out = await requestMessage({
-        toUserId: artist.userId,
-        toName: artist.name,
-        toEmail: artist.email,
-        intro: "",
-      });
-      if (out.note === "conversation exists" || out.note === "already approved") {
-        setSuccessId(artist.userId);
-        setTimeout(onSent, 900);
-      } else {
-        setSuccessId(artist.userId);
-        setTimeout(onSent, 900);
-      }
+      await onPicked(person);
     } catch (e) {
-      if (e.code === "email-not-verified") setError("Verify your email before messaging.");
-      else if (e.code === "cooldown") setError("You can try again in a few days.");
-      else setError(e.message);
-    } finally {
+      setError(e.message);
       setBusyId(null);
     }
   };
@@ -268,7 +197,7 @@ function AddArtistModal({ currentUser, onClose, onSent }) {
             <input
               autoFocus
               style={{ ...inputStyle(), paddingLeft: 32, fontSize: 13 }}
-              placeholder="Search artists..."
+              placeholder="Search people..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -282,18 +211,17 @@ function AddArtistModal({ currentUser, onClose, onSent }) {
         )}
 
         <div style={{ overflowY: "auto", padding: 8 }}>
-          {loading && <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>Loading artists...</div>}
+          {loading && <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>Loading...</div>}
           {!loading && filtered.length === 0 && (
-            <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>No artists match.</div>
+            <div style={{ padding: 12, opacity: 0.6, fontSize: 13 }}>No matches.</div>
           )}
-          {filtered.map((a) => {
-            const busy = busyId === a.userId;
-            const sent = successId === a.userId;
+          {filtered.map((p) => {
+            const busy = busyId === p.userId;
             return (
               <button
-                key={a.userId}
-                onClick={() => send(a)}
-                disabled={busy || sent}
+                key={p.userId}
+                onClick={() => pick(p)}
+                disabled={busy}
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
                   width: "100%", padding: 10, borderRadius: 6,
@@ -304,18 +232,15 @@ function AddArtistModal({ currentUser, onClose, onSent }) {
                 }}
               >
                 <div style={{ width: 40, height: 40, borderRadius: "50%", background: theme.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: 700, color: theme.accent }}>
-                  {a.name?.[0]?.toUpperCase() || "?"}
+                  {p.name?.[0]?.toUpperCase() || "?"}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {a.name}
+                    {p.name}
                   </div>
                   <div style={{ fontSize: 11, opacity: 0.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {a.role === "admin" ? "Admin" : "Artist"}
+                    {p.role === "admin" ? "Admin" : "Artist"}
                   </div>
-                </div>
-                <div style={{ flexShrink: 0, fontSize: 11.5, color: sent ? "#4be88a" : theme.accent, fontWeight: 600 }}>
-                  {sent ? "Sent ✓" : busy ? "..." : "Message"}
                 </div>
               </button>
             );

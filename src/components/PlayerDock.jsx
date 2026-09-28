@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X, ListPlus, Plus, Info, Share2, MessageSquare } from "lucide-react";
 import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID, PLAYLIST_SONGS_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "./ui";
-import { requestMessage } from "../lib/api";
+import { openConversation } from "../lib/api";
 
 
 function Row({ label, value }) {
@@ -21,7 +21,7 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, currentUser, onClose }) {
+export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, currentUser, onClose, onOpenChat }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -218,16 +218,13 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
     setMsgBusy(true);
     setMsgNote("");
     try {
-      const out = await requestMessage({
-        toUserId: artistUserId,
-        toName: song.artistName,
-        toEmail: song.uploadedByEmail || "",
-        intro: "",
-      });
-      if (out.note === "conversation exists" || out.note === "already approved") {
-        setMsgNote("Open Messages to continue.");
+      const out = await openConversation(artistUserId);
+      if (out?.conversation && onOpenChat) {
+        onOpenChat(out.conversation);
+        setExpanded(false);
+        if (onClose) onClose();
       } else {
-        setMsgNote("Request sent.");
+        setMsgNote(out?.error || "Could not open chat.");
       }
     } catch (e) {
       if (e.code === "email-not-verified") setMsgNote("Verify your email first.");

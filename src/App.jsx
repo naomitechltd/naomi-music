@@ -150,6 +150,11 @@ export default function App() {
     setCurrentUser({ ...user, role: resolvedRole, avatarFileId: prefs.avatarFileId || null });
   };
 
+  const openChatFromAnywhere = (conversation) => {
+    setOpenConversation(conversation);
+    navigate("/messages");
+  };
+
   const handleLogout = async () => {
     await account.deleteSession("current");
     setOpenConversation(null);
@@ -181,7 +186,7 @@ export default function App() {
         <Route path="/messages" element={requireAuth(
           openConversation
             ? <ChatView conversation={openConversation} currentUser={currentUser} onBack={() => setOpenConversation(null)} />
-            : <MessagesView currentUser={currentUser} onOpenChat={setOpenConversation} />
+            : <MessagesView currentUser={currentUser} onOpenChat={openChatFromAnywhere} />
         )} />
         <Route path="/profile" element={requireAuth(<ProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} onLogout={handleLogout} />)} />
         <Route path="/song/:id" element={<SongPage currentUser={currentUser} onPlaySong={playSong} onPlay={playSong} />} />
@@ -203,6 +208,7 @@ export default function App() {
           setExpanded={setPlayerExpanded}
           currentUser={currentUser}
           onClose={() => setPlayerIndex(null)}
+          onOpenChat={openChatFromAnywhere}
         />
       )}
     </div>

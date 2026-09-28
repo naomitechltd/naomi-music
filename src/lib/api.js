@@ -28,6 +28,7 @@ export const requestMessage = (payload) => call("request-message", payload);
 export const listRequests = () => call("list-requests");
 export const respondRequest = (requestId, decision) => call("respond-request", { requestId, decision });
 export const listConversations = () => call("list-conversations");
+export const openConversation = (toUserId) => call("open-conversation", { toUserId });
 export const listMessages = (conversationId) => call("list-messages", { conversationId });
 export const sendMessage = (payload) => call("send-message", payload);
 export const markRead = (conversationId) => call("mark-read", { conversationId });

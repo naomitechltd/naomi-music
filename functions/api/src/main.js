@@ -250,6 +250,38 @@ async function listArtists(teams, users, userId) {
   return { ok: true, artists: out };
 }
 
+
+async function openConversation(db, users, userId, body) {
+  const { toUserId } = body;
+  if (!toUserId) return { error: "missing recipient", code: 400 };
+  if (toUserId === userId) return { error: "cannot message yourself", code: 400 };
+
+  const toUser = await users.get(toUserId).catch(() => null);
+  if (!toUser) return { error: "user not found", code: 404 };
+
+  // Look for an existing conversation with both users
+  const mine = await db.listRows(process.env.DATABASE_ID, process.env.CONVERSATIONS_TABLE_ID, [
+    Query.contains("participants", [userId]),
+  ]);
+  const existing = mine.rows.find((c) => c.participants?.includes(toUserId));
+  if (existing) return { ok: true, conversation: existing, existing: true };
+
+  const me = await users.get(userId);
+  const [a, b] = [userId, toUserId].sort();
+  const nameFor = (id) => id === userId ? (me.name || me.email) : (toUser.name || toUser.email);
+  const userNames = [nameFor(a), nameFor(b)];
+
+  const row = await db.createRow(process.env.DATABASE_ID, process.env.CONVERSATIONS_TABLE_ID, "unique()", {
+    participants: [a, b],
+    userNames,
+    lastMessage: "",
+    lastMessageAt: new Date().toISOString(),
+    unreadA: 0,
+    unreadB: 0,
+  });
+  return { ok: true, conversation: row, existing: false };
+}
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -295,6 +327,7 @@ export default async ({ req, res, log, error }) => {
     if (action === "request-message") { const out = await requestMessage(db, users, teams, userId, body); return res.json(out, out.code || 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }
     if (action === "respond-request") { const out = await respondRequest(db, teams, userId, body); return res.json(out, out.code || 200); }
+    if (action === "open-conversation") { const out = await openConversation(db, users, userId, body); return res.json(out, out.code || 200); }
     if (action === "list-conversations") { const out = await listConversations(db, userId); return res.json(out, 200); }
     if (action === "list-messages") { const out = await listMessages(db, userId, body); return res.json(out, out.code || 200); }
     if (action === "send-message") { const out = await sendMessage(db, userId, body); return res.json(out, out.code || 200); }
