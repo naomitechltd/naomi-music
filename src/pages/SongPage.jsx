@@ -18,7 +18,42 @@ export function SongPage({ currentUser, onPlaySong, onPlay }) {
       .getRow(DATABASE_ID, SONGS_TABLE_ID, id)
       .then((row) => {
         setSong(row);
-        document.title = `${row.title} — ${row.artistName} | Naomi Music`;
+        const title = `${row.title} — ${row.artistName} | Naomi Music`;
+        const desc = row.description || `${row.title} by ${row.artistName} on Naomi Music. ${row.genre || ""} · ${row.releaseType || "single"}`;
+        document.title = title;
+
+        const setMeta = (selector, attr, value) => {
+          let el = document.head.querySelector(selector);
+          if (!el) {
+            el = document.createElement("meta");
+            const [k, v] = attr.split("=");
+            el.setAttribute(k, v);
+            document.head.appendChild(el);
+          }
+          el.setAttribute("content", value);
+        };
+
+        setMeta('meta[name="description"]', "name=description", desc);
+        setMeta('meta[property="og:title"]', "property=og:title", title);
+        setMeta('meta[property="og:description"]', "property=og:description", desc);
+        setMeta('meta[property="og:type"]', "property=og:type", "music.song");
+
+        const ldId = "song-jsonld";
+        let ld = document.getElementById(ldId);
+        if (!ld) {
+          ld = document.createElement("script");
+          ld.type = "application/ld+json";
+          ld.id = ldId;
+          document.head.appendChild(ld);
+        }
+        ld.textContent = JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "MusicRecording",
+          name: row.title,
+          byArtist: { "@type": "MusicGroup", name: row.artistName },
+          genre: row.genre || undefined,
+          datePublished: row.$createdAt || undefined,
+        });
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
