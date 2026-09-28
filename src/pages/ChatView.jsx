@@ -4,13 +4,13 @@ import { storage, ID, BUCKET_ID, Permission, Role, fileUrl } from "../lib/appwri
 import { listMessages, sendMessage, markRead } from "../lib/api";
 import { theme, inputStyle } from "../components/ui";
 
-const MAX_ATTACH_BYTES = 1048576; // 1 MB
+const MAX_ATTACH_BYTES = 1048576;
 
 export function ChatView({ conversation, currentUser, onBack }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
-  const [attachment, setAttachment] = useState(null); // { file, name, size, mime }
+  const [attachment, setAttachment] = useState(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const scrollRef = useRef(null);
@@ -34,13 +34,11 @@ export function ChatView({ conversation, currentUser, onBack }) {
 
   useEffect(() => { load(); }, [conversation.$id]);
 
-  // Poll for new messages every 6s
   useEffect(() => {
     const t = setInterval(() => load({ quiet: true }), 6000);
     return () => clearInterval(t);
   }, [conversation.$id]);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -104,33 +102,102 @@ export function ChatView({ conversation, currentUser, onBack }) {
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 16px", display: "flex", flexDirection: "column", height: "calc(100vh - 57px)", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 10, borderBottom: `1px solid ${theme.border}`, marginBottom: 10 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex", padding: 4 }}>
-          <ChevronLeft size={20} />
+    <div
+      style={{
+        maxWidth: 640,
+        margin: "0 auto",
+        padding: "0 0 0",
+        display: "flex",
+        flexDirection: "column",
+        height: "calc(100vh - 57px)",
+        overflow: "hidden",
+        background: theme.bg,
+      }}
+    >
+      {/* Header — fixed at top */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "10px 16px",
+          borderBottom: `1px solid ${theme.border}`,
+          background: theme.bg,
+          flexShrink: 0,
+        }}
+      >
+        <button
+          onClick={onBack}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: theme.text,
+            display: "flex",
+            padding: 4,
+          }}
+        >
+          <ChevronLeft size={22} />
         </button>
-        <div style={{ fontSize: 15, fontWeight: 700 }}>{otherName}</div>
+        <div style={{ width: 32, height: 32, borderRadius: "50%", background: theme.bgRaised, display: "flex", alignItems: "center", justifyContent: "center", color: theme.accent, fontWeight: 700, fontSize: 13 }}>
+          {otherName[0]?.toUpperCase() || "?"}
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>{otherName}</div>
       </div>
 
-      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 12, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-        {loading && <div style={{ opacity: 0.6, fontSize: 13 }}>Loading...</div>}
-        {!loading && messages.length === 0 && <div style={{ opacity: 0.6, fontSize: 13 }}>Say hi!</div>}
+      {/* Messages */}
+      <div
+        ref={scrollRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          padding: "14px 16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+        }}
+      >
+        {loading && <div style={{ opacity: 0.6, fontSize: 13, margin: "auto" }}>Loading…</div>}
+
+        {!loading && messages.length === 0 && (
+          <div
+            style={{
+              margin: "auto",
+              textAlign: "center",
+              opacity: 0.55,
+              fontSize: 13,
+              padding: 24,
+            }}
+          >
+            <div style={{ fontSize: 32, marginBottom: 10 }}>👋</div>
+            Say hi to {otherName.split(" ")[0]}
+          </div>
+        )}
 
         {messages.map((m) => {
           const mine = m.senderUserId === currentUser.$id;
           return (
-            <div key={m.$id} style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 8 }}>
+            <div
+              key={m.$id}
+              style={{
+                display: "flex",
+                justifyContent: mine ? "flex-end" : "flex-start",
+              }}
+            >
               <div
                 style={{
                   maxWidth: "78%",
                   background: mine ? theme.accent : theme.bgRaised,
                   color: mine ? "#fff" : theme.text,
                   border: mine ? "none" : `1px solid ${theme.border}`,
-                  borderRadius: 14,
-                  padding: "8px 12px",
-                  fontSize: 13.5,
-                  lineHeight: 1.45,
+                  borderRadius: 18,
+                  padding: "8px 14px",
+                  fontSize: 14,
+                  lineHeight: 1.4,
                   wordBreak: "break-word",
+                  borderBottomRightRadius: mine ? 4 : 18,
+                  borderBottomLeftRadius: mine ? 18 : 4,
                 }}
               >
                 {m.body && <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>}
@@ -139,7 +206,15 @@ export function ChatView({ conversation, currentUser, onBack }) {
                     href={fileUrl(m.attachmentField)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, color: mine ? "#fff" : theme.accent, fontSize: 12.5, marginTop: m.body ? 6 : 0, textDecoration: "underline" }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      color: mine ? "#fff" : theme.accent,
+                      fontSize: 12.5,
+                      marginTop: m.body ? 6 : 0,
+                      textDecoration: "underline",
+                    }}
                   >
                     <FileText size={14} /> {m.attachmentName || "attachment"}
                   </a>
@@ -150,25 +225,66 @@ export function ChatView({ conversation, currentUser, onBack }) {
         })}
       </div>
 
-      {error && <div style={{ color: theme.danger, fontSize: 12.5, marginBottom: 6 }}>{error}</div>}
-
+      {/* Attachment preview */}
       {attachment && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 6, marginBottom: 8, fontSize: 12.5 }}>
+        <div
+          style={{
+            margin: "0 16px 8px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 12px",
+            background: theme.bgRaised,
+            border: `1px solid ${theme.border}`,
+            borderRadius: 10,
+            fontSize: 12.5,
+          }}
+        >
           <FileText size={14} />
           <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{attachment.name}</span>
           <span style={{ opacity: 0.5 }}>{(attachment.size / 1024).toFixed(0)} KB</span>
-          <button onClick={() => setAttachment(null)} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex", padding: 0 }}>
+          <button
+            onClick={() => setAttachment(null)}
+            style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex", padding: 0 }}
+          >
             <X size={14} />
           </button>
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", padding: "10px 0 14px", borderTop: `1px solid ${theme.border}` }}>
+      {error && (
+        <div style={{ padding: "0 16px 8px", color: theme.danger, fontSize: 12.5 }}>{error}</div>
+      )}
+
+      {/* Input bar — Meta AI style */}
+      <div
+        style={{
+          flexShrink: 0,
+          padding: "8px 12px 14px",
+          borderTop: `1px solid ${theme.border}`,
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 8,
+        }}
+      >
         <button
           onClick={() => fileRef.current?.click()}
           disabled={sending}
-          style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: 0.7, display: "flex", padding: 10 }}
           title="Attach PDF or TXT (max 1 MB)"
+          style={{
+            background: theme.bgRaised,
+            border: `1px solid ${theme.border}`,
+            borderRadius: "50%",
+            color: theme.text,
+            opacity: 0.8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 40,
+            height: 40,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
         >
           <Paperclip size={18} />
         </button>
@@ -181,22 +297,44 @@ export function ChatView({ conversation, currentUser, onBack }) {
         />
         <textarea
           rows={1}
-          style={{ ...inputStyle(), resize: "none", minHeight: 42, maxHeight: 120, paddingTop: 10, paddingBottom: 10 }}
-          placeholder="Message..."
+          placeholder="Message"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKey}
           disabled={sending}
+          style={{
+            flex: 1,
+            background: theme.bgRaised,
+            border: `1px solid ${theme.border}`,
+            borderRadius: 20,
+            color: theme.text,
+            padding: "10px 16px",
+            fontSize: 14,
+            fontFamily: "inherit",
+            outline: "none",
+            resize: "none",
+            minHeight: 40,
+            maxHeight: 120,
+            boxSizing: "border-box",
+            lineHeight: 1.4,
+          }}
         />
         <button
           onClick={send}
           disabled={sending || (!text.trim() && !attachment)}
           style={{
-            background: theme.accent, border: "none", borderRadius: 8,
-            color: "#fff", cursor: sending ? "wait" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: 42, height: 42, opacity: sending || (!text.trim() && !attachment) ? 0.5 : 1,
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            background: theme.accent,
+            border: "none",
+            color: "#fff",
+            cursor: sending ? "wait" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             flexShrink: 0,
+            opacity: sending || (!text.trim() && !attachment) ? 0.5 : 1,
           }}
         >
           <Send size={16} />
