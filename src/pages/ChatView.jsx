@@ -104,14 +104,18 @@ export function ChatView({ conversation, currentUser, onBack }) {
   return (
     <div
       style={{
+        position: "fixed",
+        top: 56,
+        bottom: 0,
+        left: 0,
+        right: 0,
         maxWidth: 640,
         margin: "0 auto",
-        padding: "0 0 0",
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 57px)",
         overflow: "hidden",
         background: theme.bg,
+        zIndex: 50,
       }}
     >
       {/* Header — fixed at top */}
