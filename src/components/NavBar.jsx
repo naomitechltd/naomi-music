@@ -1,27 +1,28 @@
 import React, { useState, useEffect } from "react";
-import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu, X, MessageSquare } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu, X, MessageSquare, Radio } from "lucide-react";
 import { theme } from "./ui";
 import { fileUrl } from "../lib/appwrite";
 
 const LEGAL_ITEMS = [
-  { key: "about", label: "About" },
-  { key: "terms", label: "Terms of Use" },
-  { key: "privacy", label: "Privacy Policy" },
-  { key: "tscs", label: "T's and C's" },
-  { key: "developer", label: "Developer" },
+  { path: "/about", label: "About" },
+  { path: "/terms", label: "Terms of Use" },
+  { path: "/privacy", label: "Privacy Policy" },
+  { path: "/tscs", label: "T's and C's" },
+  { path: "/developer", label: "Developer" },
 ];
 
-export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }) {
+export function NavBar({ isArtist, isAdmin, currentUser, onLogout, onStartRadio }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [logoText, setLogoText] = useState("Naomi Music");
   const [logoFading, setLogoFading] = useState(false);
 
-  // Rotate: 30s "Naomi Music" -> swap to "Home", hold 10s -> swap back. Loops.
   useEffect(() => {
     let cancelled = false;
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
     const swap = async (next) => {
       if (cancelled) return;
       setLogoFading(true);
@@ -30,7 +31,6 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
       setLogoText(next);
       setLogoFading(false);
     };
-
     (async () => {
       while (!cancelled) {
         await sleep(30000);
@@ -41,19 +41,24 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
         await swap("Naomi Music");
       }
     })();
-
     return () => { cancelled = true; };
   }, []);
 
   const items = [
-    { key: "browse", label: "Home", icon: Home },
-    { key: "playlists", label: "Playlists", icon: Library },
-    { key: "messages", label: "Messages", icon: MessageSquare },
-    ...(isArtist ? [{ key: "upload", label: "Upload", icon: UploadCloud }] : []),
-    ...(isArtist ? [{ key: "mysongs", label: "My Songs", icon: ListMusic }] : []),
-    ...(isAdmin ? [{ key: "admin", label: "Admin", icon: ShieldCheck }] : []),
+    { path: "/", label: "Home", icon: Home },
+    { path: "/playlists", label: "Playlists", icon: Library },
+    { path: "/messages", label: "Messages", icon: MessageSquare },
+    ...(isArtist ? [{ path: "/upload", label: "Upload", icon: UploadCloud }] : []),
+    ...(isArtist ? [{ path: "/mysongs", label: "My Songs", icon: ListMusic }] : []),
+    ...(isAdmin ? [{ path: "/admin", label: "Admin", icon: ShieldCheck }] : []),
   ];
-  const mobileNavItems = items.filter((it) => it.key !== "browse");
+
+  const mobileNavItems = items.filter((it) => it.path !== "/");
+
+  const isActive = (path) => {
+    if (path === "/") return location.pathname === "/";
+    return location.pathname.startsWith(path);
+  };
 
   const iconBtnStyle = (active) => ({
     background: "none",
@@ -67,8 +72,8 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
     borderRadius: 6,
   });
 
-  const go = (key) => {
-    setTab(key);
+  const go = (path) => {
+    navigate(path);
     setMobileOpen(false);
     setProfileOpen(false);
   };
@@ -76,10 +81,7 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
   return (
     <div style={{ position: "sticky", top: 0, zIndex: 100, background: theme.bg, borderBottom: `1px solid ${theme.border}` }}>
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
-        <button
-          onClick={() => go("browse")}
-          style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, fontWeight: 700, fontSize: 16, padding: 0, fontFamily: "inherit", textAlign: "left" }}
-        >
+        <button onClick={() => go("/")} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, fontWeight: 700, fontSize: 16, padding: 0, fontFamily: "inherit", textAlign: "left" }}>
           <span style={{ display: "inline-grid" }}>
             <span
               style={{
@@ -92,10 +94,7 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
             >
               {logoText}
             </span>
-            <span
-              aria-hidden="true"
-              style={{ gridArea: "1 / 1", visibility: "hidden", pointerEvents: "none", whiteSpace: "nowrap" }}
-            >
+            <span aria-hidden="true" style={{ gridArea: "1 / 1", visibility: "hidden", pointerEvents: "none", whiteSpace: "nowrap" }}>
               Naomi Music
             </span>
           </span>
@@ -103,10 +102,16 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
 
         <div className="nm-desktop-nav" style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {items.map((it) => (
-            <button key={it.key} title={it.label} onClick={() => go(it.key)} style={iconBtnStyle(tab === it.key)}>
+            <button key={it.path} title={it.label} onClick={() => go(it.path)} style={iconBtnStyle(isActive(it.path))}>
               <it.icon size={19} />
             </button>
           ))}
+
+          {onStartRadio && (
+            <button title="Start radio" onClick={onStartRadio} style={{ ...iconBtnStyle(false), color: theme.accent }}>
+              <Radio size={19} />
+            </button>
+          )}
 
           <div style={{ position: "relative", marginLeft: 6 }}>
             <button title={currentUser.name} onClick={() => setProfileOpen((v) => !v)} style={{ ...iconBtnStyle(profileOpen), padding: 2 }}>
@@ -121,7 +126,7 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{currentUser.name}</div>
                 <div style={{ fontSize: 11.5, opacity: 0.6, marginBottom: 10, textTransform: "capitalize" }}>{currentUser.role}</div>
                 <button
-                  onClick={() => go("profile")}
+                  onClick={() => go("/profile")}
                   style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: theme.text, cursor: "pointer", fontSize: 13, fontFamily: "inherit", padding: 0, marginBottom: 10 }}
                 >
                   <User size={15} /> View profile
@@ -135,11 +140,7 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
         </div>
 
         <div className="nm-mobile-toggle" style={{ display: "none", alignItems: "center", gap: 8 }}>
-          <button
-            onClick={() => go("profile")}
-            title="Profile"
-            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex" }}
-          >
+          <button onClick={() => go("/profile")} title="Profile" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex" }}>
             {currentUser.avatarFileId ? (
               <img src={fileUrl(currentUser.avatarFileId)} alt={currentUser.name} style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", border: `1px solid ${theme.border}` }} />
             ) : (
@@ -155,10 +156,7 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
       </div>
 
       {mobileOpen && (
-        <div
-          onClick={() => setMobileOpen(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 190 }}
-        />
+        <div onClick={() => setMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 190 }} />
       )}
 
       <div
@@ -176,18 +174,26 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
         </div>
 
         <div style={{ padding: "10px 20px", display: "flex", flexDirection: "column", gap: 2 }}>
+          {onStartRadio && (
+            <button
+              onClick={() => { onStartRadio(); setMobileOpen(false); }}
+              style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: theme.accent, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
+            >
+              <Radio size={18} /> Radio
+            </button>
+          )}
           <button
-            onClick={() => go("profile")}
-            style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: tab === "profile" ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
+            onClick={() => go("/profile")}
+            style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: isActive("/profile") ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
           >
             <User size={18} /> Profile
           </button>
           <div style={{ borderTop: `1px solid ${theme.border}`, margin: "6px 0" }} />
           {mobileNavItems.map((it) => (
             <button
-              key={it.key}
-              onClick={() => go(it.key)}
-              style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: tab === it.key ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
+              key={it.path}
+              onClick={() => go(it.path)}
+              style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: isActive(it.path) ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
             >
               <it.icon size={18} /> {it.label}
             </button>
@@ -197,9 +203,9 @@ export function NavBar({ tab, setTab, isArtist, isAdmin, currentUser, onLogout }
 
           {LEGAL_ITEMS.map((it) => (
             <button
-              key={it.key}
-              onClick={() => go(it.key)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: tab === it.key ? theme.accent : theme.text, opacity: 0.85, fontSize: 13.5, padding: "9px 4px", fontFamily: "inherit", textAlign: "left" }}
+              key={it.path}
+              onClick={() => go(it.path)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: isActive(it.path) ? theme.accent : theme.text, opacity: 0.85, fontSize: 13.5, padding: "9px 4px", fontFamily: "inherit", textAlign: "left" }}
             >
               {it.label}
             </button>
