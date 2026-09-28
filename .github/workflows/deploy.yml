@@ -1,0 +1,43 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build with sitemap generation
+        run: npm run build
+        env:
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_PROJECT_ID: ${{ secrets.APPWRITE_PROJECT_ID }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          APPWRITE_DB_ID: ${{ secrets.APPWRITE_DB_ID }}
+          APPWRITE_SONGS_TABLE_ID: ${{ secrets.APPWRITE_SONGS_TABLE_ID }}
+          VITE_APPWRITE_ENDPOINT: ${{ secrets.VITE_APPWRITE_ENDPOINT }}
+          VITE_APPWRITE_PROJECT_ID: ${{ secrets.VITE_APPWRITE_PROJECT_ID }}
+          VITE_APPWRITE_DATABASE_ID: ${{ secrets.VITE_APPWRITE_DATABASE_ID }}
+          VITE_APPWRITE_BUCKET_ID: ${{ secrets.VITE_APPWRITE_BUCKET_ID }}
+          VITE_APPWRITE_SONGS_TABLE_ID: ${{ secrets.VITE_APPWRITE_SONGS_TABLE_ID }}
+          VITE_APPWRITE_LIKES_TABLE_ID: ${{ secrets.VITE_APPWRITE_LIKES_TABLE_ID }}
+          VITE_APPWRITE_PLAYLISTS_TABLE_ID: ${{ secrets.VITE_APPWRITE_PLAYLISTS_TABLE_ID }}
+          VITE_APPWRITE_PLAYLIST_SONGS_TABLE_ID: ${{ secrets.VITE_APPWRITE_PLAYLIST_SONGS_TABLE_ID }}
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=naomi-music
