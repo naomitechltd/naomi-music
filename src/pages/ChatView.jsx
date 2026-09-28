@@ -104,15 +104,15 @@ export function ChatView({ conversation, currentUser, onBack }) {
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", padding: "20px 16px 0", display: "flex", flexDirection: "column", height: "calc(100vh - 60px)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 12, borderBottom: `1px solid ${theme.border}`, marginBottom: 12 }}>
+    <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 16px", display: "flex", flexDirection: "column", height: "calc(100vh - 57px)", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingBottom: 10, borderBottom: `1px solid ${theme.border}`, marginBottom: 10 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex", padding: 4 }}>
           <ChevronLeft size={20} />
         </button>
         <div style={{ fontSize: 15, fontWeight: 700 }}>{otherName}</div>
       </div>
 
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", paddingBottom: 12 }}>
+      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingBottom: 12, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         {loading && <div style={{ opacity: 0.6, fontSize: 13 }}>Loading...</div>}
         {!loading && messages.length === 0 && <div style={{ opacity: 0.6, fontSize: 13 }}>Say hi!</div>}
 
