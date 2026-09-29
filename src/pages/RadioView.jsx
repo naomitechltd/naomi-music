@@ -1,11 +1,9 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, Pause, Radio as RadioIcon, Volume2, Users } from "lucide-react";
-import { fileUrl } from "../lib/appwrite";
-import { functions } from "../lib/appwrite";
+import { Play, Pause, Radio as RadioIcon } from "lucide-react";
+import { functions, fileUrl } from "../lib/appwrite";
 import { theme } from "../components/ui";
 
-// Call radio-now action; optionally report the song duration
 async function callRadioNow(opts = {}) {
   const res = await functions.createExecution(
     "api",
@@ -31,22 +29,94 @@ function formatTime(sec) {
 export function RadioView() {
   const navigate = useNavigate();
   const audioRef = useRef(null);
+  const reloadingRef = useRef(false);   // true while we're mid-load
+  const targetRef = useRef({ elapsedMs: 0 }); // pending seek position
+
   const [song, setSong] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [listeners, setListeners] = useState(1);
 
-  // Poll every 5s for updates + drift correction
+  // Load a specific song and seek to the right position once metadata is ready
+  const loadAndSeek = (songRow, sequence, elapsedMs) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    reloadingRef.current = true;
+    targetRef.current = { elapsedMs: Math.max(0, elapsedMs || 0) };
+
+    // Tag the audio element immediately so polling knows we're on this song
+    audio.dataset.songId = songRow.$id;
+    audio.dataset.seq = String(sequence || 0);
+
+    setSong(songRow);
+    setDuration(0);
+    setCurrent(0);
+
+    // Set the source — the loadedmetadata handler will seek + play
+    audio.src = fileUrl(songRow.audioField);
+  };
+
+  // Metadata handler — seek then play, clear the "reloading" flag
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onMeta = async () => {
+      const d = audio.duration || 0;
+      setDuration(d);
+
+      // Seek to target now that duration is known
+      const seekSec = Math.min(
+        targetRef.current.elapsedMs / 1000,
+        Math.max(0, d - 1)   // don't seek past the end
+      );
+      audio.currentTime = seekSec;
+
+      try {
+        await audio.play();
+        setPlaying(true);
+      } catch { setPlaying(false); }
+
+      reloadingRef.current = false;
+
+      // Report duration once, for the server scheduler
+      if (audio.dataset.songId) {
+        callRadioNow({ songId: audio.dataset.songId, durationMs: Math.round(d * 1000) });
+      }
+    };
+
+    const onTime = () => setCurrent(audio.currentTime);
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onEnded = () => setPlaying(false);
+
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("ended", onEnded);
+    return () => {
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("ended", onEnded);
+    };
+  }, []);
+
+  // Poll every 5s
   useEffect(() => {
     let cancelled = false;
 
     const tick = async () => {
+      if (cancelled) return;
+      if (reloadingRef.current) return;   // don't interfere mid-load
+
       const out = await callRadioNow();
       if (cancelled) return;
-
       if (!out.ok) {
         setError(out.error || "Radio unavailable");
         setLoading(false);
@@ -55,64 +125,38 @@ export function RadioView() {
       setError("");
 
       const audio = audioRef.current;
-      if (!audio) return;
+      if (!audio || !out.song) return;
 
-      // Switch songs
-      if (audio.dataset.songId !== out.song.$id) {
-        audio.dataset.songId = out.song.$id;
-        audio.src = fileUrl(out.song.audioField);
-        audio.currentTime = Math.max(0, out.elapsedMs / 1000);
-        audio.play().then(() => setPlaying(true)).catch(() => {});
-        setSong(out.song);
+      const serverSongId = out.song.$id;
+      const serverSeq = String(out.sequence ?? 0);
+
+      // Song changed → load it
+      if (audio.dataset.songId !== serverSongId) {
+        loadAndSeek(out.song, out.sequence, out.elapsedMs);
         setLoading(false);
         return;
       }
 
-      // If server says we're in a new rotation but the same audio is playing,
-      // detect via sequence change and force-reload
-      if (out.sequence != null && audio.dataset.seq !== String(out.sequence)) {
-        audio.dataset.seq = String(out.sequence);
-        audio.src = fileUrl(out.song.audioField);
-        audio.currentTime = Math.max(0, out.elapsedMs / 1000);
-        audio.play().then(() => setPlaying(true)).catch(() => {});
-        setSong(out.song);
+      // Same song but server advanced to next rotation (rare)
+      if (audio.dataset.seq !== serverSeq) {
+        loadAndSeek(out.song, out.sequence, out.elapsedMs);
+        return;
       }
 
-      // Drift correction
-      if (!audio.paused) {
-        const currentMs = audio.currentTime * 1000;
-        if (Math.abs(currentMs - out.elapsedMs) > 2000) {
-          audio.currentTime = out.elapsedMs / 1000;
+      // Same song → drift correction only if audio is actually playing
+      if (!audio.paused && audio.readyState >= 2) {
+        const drift = audio.currentTime * 1000 - out.elapsedMs;
+        if (Math.abs(drift) > 2500) {
+          audio.currentTime = Math.max(0, out.elapsedMs / 1000);
         }
       }
+
+      setLoading(false);
     };
 
     tick();
     const id = setInterval(tick, 5000);
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
-
-  // Report duration once known
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const onMeta = async () => {
-      const d = audio.duration;
-      if (d && isFinite(d) && audio.dataset.songId) {
-        await callRadioNow({ songId: audio.dataset.songId, durationMs: Math.round(d * 1000) });
-      }
-      setDuration(d || 0);
-    };
-    const onTime = () => setCurrent(audio.currentTime);
-    const onEnd = () => { /* server will advance on next poll */ };
-    audio.addEventListener("loadedmetadata", onMeta);
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("ended", onEnd);
-    return () => {
-      audio.removeEventListener("loadedmetadata", onMeta);
-      audio.removeEventListener("timeupdate", onTime);
-      audio.removeEventListener("ended", onEnd);
-    };
   }, []);
 
   const toggle = () => {
@@ -125,17 +169,9 @@ export function RadioView() {
   const progress = duration ? (current / duration) * 100 : 0;
 
   return (
-    <div
-      style={{
-        maxWidth: 640,
-        margin: "0 auto",
-        padding: "24px 20px 120px",
-        minHeight: "calc(100vh - 57px)",
-      }}
-    >
-      <audio ref={audioRef} preload="auto" />
+    <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 20px 120px", minHeight: "calc(100vh - 57px)" }}>
+      <audio ref={audioRef} preload="auto" crossOrigin="anonymous" />
 
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 26 }}>
         <div
           style={{
@@ -159,26 +195,15 @@ export function RadioView() {
       {loading && <div style={{ opacity: 0.6, fontSize: 13, textAlign: "center", padding: 40 }}>Tuning in…</div>}
       {error && <div style={{ color: theme.danger, fontSize: 13, textAlign: "center", padding: 40 }}>{error}</div>}
 
-      {/* Now playing */}
       {song && (
         <>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 20,
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
             <img
               src={fileUrl(song.coverArtField)}
               alt={song.title}
               style={{
-                width: "100%",
-                maxWidth: 320,
-                aspectRatio: "1",
-                objectFit: "cover",
-                borderRadius: 14,
+                width: "100%", maxWidth: 320, aspectRatio: "1",
+                objectFit: "cover", borderRadius: 14,
                 boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
               }}
             />
@@ -189,28 +214,16 @@ export function RadioView() {
             <button
               onClick={() => navigate(`/artist/${song.uploadedByUserId}`)}
               style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                color: theme.accent,
-                fontSize: 15,
-                fontFamily: "inherit",
+                background: "none", border: "none", padding: 0,
+                cursor: "pointer", color: theme.accent,
+                fontSize: 15, fontFamily: "inherit",
               }}
             >
               {song.artistName}
             </button>
           </div>
 
-          {/* Progress */}
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 420,
-              margin: "0 auto",
-              padding: "0 20px",
-            }}
-          >
+          <div style={{ width: "100%", maxWidth: 420, margin: "0 auto", padding: "0 20px" }}>
             <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.12)", position: "relative" }}>
               <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${progress}%`, borderRadius: 2, background: theme.accent }} />
             </div>
@@ -220,7 +233,6 @@ export function RadioView() {
             </div>
           </div>
 
-          {/* Controls */}
           <div style={{ display: "flex", justifyContent: "center", marginTop: 26 }}>
             <button
               onClick={toggle}
