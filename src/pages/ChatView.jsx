@@ -39,6 +39,7 @@ export function ChatView({ conversation, currentUser, onBack }) {
     return () => clearInterval(t);
   }, [conversation.$id]);
 
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -56,7 +57,12 @@ export function ChatView({ conversation, currentUser, onBack }) {
       return;
     }
     setError("");
-    setAttachment({ file: f, name: f.name, size: f.size, mime: f.type || (ext === "pdf" ? "application/pdf" : "text/plain") });
+    setAttachment({
+      file: f,
+      name: f.name,
+      size: f.size,
+      mime: f.type || (ext === "pdf" ? "application/pdf" : "text/plain"),
+    });
   };
 
   const send = async () => {
@@ -106,9 +112,9 @@ export function ChatView({ conversation, currentUser, onBack }) {
       style={{
         position: "fixed",
         top: 56,
-        bottom: 0,
         left: 0,
         right: 0,
+        bottom: 0,
         maxWidth: 640,
         margin: "0 auto",
         display: "flex",
@@ -118,16 +124,18 @@ export function ChatView({ conversation, currentUser, onBack }) {
         zIndex: 50,
       }}
     >
-      {/* Header — fixed at top */}
+      {/* Header — locked */}
       <div
         style={{
+          flexShrink: 0,
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          gap: 10,
           padding: "10px 16px",
           borderBottom: `1px solid ${theme.border}`,
-          background: theme.bg,
-          flexShrink: 0,
+          background: theme.bgRaised,
+          height: 56,
+          boxSizing: "border-box",
         }}
       >
         <button
@@ -141,28 +149,57 @@ export function ChatView({ conversation, currentUser, onBack }) {
             padding: 4,
           }}
         >
-          <ChevronLeft size={22} />
+          <ChevronLeft size={24} />
         </button>
-        <div style={{ width: 32, height: 32, borderRadius: "50%", background: theme.bgRaised, display: "flex", alignItems: "center", justifyContent: "center", color: theme.accent, fontWeight: 700, fontSize: 13 }}>
+        <div
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: "50%",
+            background: theme.bg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: theme.accent,
+            fontWeight: 700,
+            fontSize: 14,
+            flexShrink: 0,
+          }}
+        >
           {otherName[0]?.toUpperCase() || "?"}
         </div>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>{otherName}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {otherName}
+          </div>
+        </div>
       </div>
 
-      {/* Messages */}
+      {/* Messages — the ONLY scrollable area */}
       <div
         ref={scrollRef}
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
           padding: "14px 16px",
           display: "flex",
           flexDirection: "column",
-          gap: 6,
+          gap: 4,
         }}
       >
-        {loading && <div style={{ opacity: 0.6, fontSize: 13, margin: "auto" }}>Loading…</div>}
+        {loading && (
+          <div style={{ opacity: 0.6, fontSize: 13, margin: "auto" }}>Loading…</div>
+        )}
 
         {!loading && messages.length === 0 && (
           <div
@@ -187,6 +224,7 @@ export function ChatView({ conversation, currentUser, onBack }) {
               style={{
                 display: "flex",
                 justifyContent: mine ? "flex-end" : "flex-start",
+                marginBottom: 2,
               }}
             >
               <div
@@ -233,7 +271,8 @@ export function ChatView({ conversation, currentUser, onBack }) {
       {attachment && (
         <div
           style={{
-            margin: "0 16px 8px",
+            flexShrink: 0,
+            margin: "6px 12px 0",
             display: "flex",
             alignItems: "center",
             gap: 8,
@@ -245,11 +284,20 @@ export function ChatView({ conversation, currentUser, onBack }) {
           }}
         >
           <FileText size={14} />
-          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{attachment.name}</span>
+          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {attachment.name}
+          </span>
           <span style={{ opacity: 0.5 }}>{(attachment.size / 1024).toFixed(0)} KB</span>
           <button
             onClick={() => setAttachment(null)}
-            style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex", padding: 0 }}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: theme.text,
+              display: "flex",
+              padding: 0,
+            }}
           >
             <X size={14} />
           </button>
@@ -257,18 +305,27 @@ export function ChatView({ conversation, currentUser, onBack }) {
       )}
 
       {error && (
-        <div style={{ padding: "0 16px 8px", color: theme.danger, fontSize: 12.5 }}>{error}</div>
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "6px 16px",
+            color: theme.danger,
+            fontSize: 12.5,
+          }}
+        >
+          {error}
+        </div>
       )}
 
-      {/* Input bar — Meta AI style */}
+      {/* Input bar — locked */}
       <div
         style={{
           flexShrink: 0,
-          padding: "8px 12px 14px",
-          borderTop: `1px solid ${theme.border}`,
+          padding: "8px 12px calc(8px + env(safe-area-inset-bottom))",
           display: "flex",
           alignItems: "flex-end",
           gap: 8,
+          background: theme.bg,
         }}
       >
         <button
@@ -297,7 +354,10 @@ export function ChatView({ conversation, currentUser, onBack }) {
           type="file"
           accept=".pdf,.txt,application/pdf,text/plain"
           style={{ display: "none" }}
-          onChange={(e) => { pickFile(e.target.files?.[0]); e.target.value = ""; }}
+          onChange={(e) => {
+            pickFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
         />
         <textarea
           rows={1}
@@ -318,7 +378,7 @@ export function ChatView({ conversation, currentUser, onBack }) {
             outline: "none",
             resize: "none",
             minHeight: 40,
-            maxHeight: 120,
+            maxHeight: 100,
             boxSizing: "border-box",
             lineHeight: 1.4,
           }}
