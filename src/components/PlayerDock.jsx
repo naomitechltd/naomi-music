@@ -232,7 +232,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
         <div
           style={{
             position: "fixed", inset: 0, zIndex: 200,
-            background: "linear-gradient(180deg, #17171d 0%, #0b0b0d 70%)",
+            background: theme.playerBg,
             display: "flex", flexDirection: "column",
           }}
         >
@@ -306,7 +306,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
             </div>
 
             {/* Progress */}
-            <div onClick={seek} style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.12)", cursor: "pointer", position: "relative" }}>
+            <div onClick={seek} style={{ height: 4, borderRadius: 2, background: theme.progressBg, cursor: "pointer", position: "relative" }}>
               <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${progress}%`, borderRadius: 2, background: theme.accent }} />
               <div style={{ position: "absolute", top: "50%", left: `${progress}%`, transform: "translate(-50%, -50%)", width: 12, height: 12, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.5)" }} />
             </div>
@@ -417,7 +417,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
               onClick={() => setShowAbout(false)}
               style={{
                 position: "fixed", inset: 0, zIndex: 260,
-                background: "rgba(0,0,0,0.88)",
+                background: theme.bg + "f5",
                 display: "flex", flexDirection: "column",
                 padding: "40px 24px 60px",
               }}
@@ -492,7 +492,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
               onClick={() => setShowLyrics(false)}
               style={{
                 position: "fixed", inset: 0, zIndex: 260,
-                background: "rgba(0,0,0,0.85)",
+                background: theme.bg + "f2",
                 display: "flex", flexDirection: "column",
                 padding: "40px 24px 60px",
               }}

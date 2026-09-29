@@ -34,6 +34,7 @@ export default function App() {
   const [splashPhase, setSplashPhase] = useState("logo");
   const [splashDone, setSplashDone] = useState(false);
   const [openConversation, setOpenConversation] = useState(null);
+  const [themeTick, setThemeTick] = useState(0);
 
   const playSong = (songs, idx) => {
     setQueue(songs);
@@ -60,6 +61,12 @@ export default function App() {
       console.warn("radio failed:", e.message);
     }
   };
+
+  useEffect(() => {
+    const h = () => setThemeTick((n) => n + 1);
+    window.addEventListener("naomi-theme-change", h);
+    return () => window.removeEventListener("naomi-theme-change", h);
+  }, []);
 
   useEffect(() => {
     const t1 = setTimeout(() => setSplashPhase("slogan"), 1200);

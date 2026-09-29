@@ -133,7 +133,7 @@ export function ChatView({ conversation, currentUser, onBack }) {
           gap: 10,
           padding: "10px 16px",
           borderBottom: `1px solid ${theme.border}`,
-          background: theme.bgRaised,
+          background: theme.navBg,
           height: 56,
           boxSizing: "border-box",
         }}
@@ -230,8 +230,8 @@ export function ChatView({ conversation, currentUser, onBack }) {
               <div
                 style={{
                   maxWidth: "78%",
-                  background: mine ? theme.accent : theme.bgRaised,
-                  color: mine ? "#fff" : theme.text,
+                  background: mine ? theme.bubbleMine : theme.bubble,
+                  color: mine ? theme.bubbleMineText : theme.text,
                   border: mine ? "none" : `1px solid ${theme.border}`,
                   borderRadius: 18,
                   padding: "8px 14px",

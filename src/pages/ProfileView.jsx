@@ -5,7 +5,7 @@ import {
   DATABASE_ID, SONGS_TABLE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID,
   Query, ID, BUCKET_ID, Permission, Role, fileUrl,
 } from "../lib/appwrite";
-import { theme, inputStyle, Button, Field, ErrorNote } from "../components/ui";
+import { theme, inputStyle, Button, Field, ErrorNote, getThemeMode, setThemeMode } from "../components/ui";
 
 export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
   const [stats, setStats] = useState({ likes: 0, playlists: 0, uploads: 0, pending: 0, approved: 0 });
@@ -182,6 +182,15 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
         <StatCard icon={ListMusic} label="Playlists" value={stats.playlists} />
       </div>
 
+      {/* Theme */}
+      <div style={{ marginTop: 28, background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 12, padding: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>Appearance</div>
+        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2, marginBottom: 14 }}>
+          Choose how Naomi Music looks.
+        </div>
+        <ThemeToggle />
+      </div>
+
       {/* Password */}
       <div style={{ marginTop: 28, background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 12, padding: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: editingPass ? 16 : 0 }}>
@@ -227,6 +236,51 @@ function StatCard({ icon: Icon, label, value, accent }) {
         <Icon size={13} color={accent || theme.text} /> {label}
       </div>
       <div style={{ fontSize: 22, fontWeight: 700, marginTop: 6, color: accent || theme.text }}>{value}</div>
+    </div>
+  );
+}
+
+function ThemeToggle() {
+  const [mode, setMode] = React.useState(getThemeMode());
+
+  const pick = (m) => {
+    setThemeMode(m);
+    setMode(m);
+    window.dispatchEvent(new Event("naomi-theme-change"));
+  };
+
+  const opts = [
+    { key: "auto", label: "Auto" },
+    { key: "light", label: "Light" },
+    { key: "dark", label: "Dark" },
+  ];
+
+  return (
+    <div style={{ display: "flex", gap: 6, background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 10, padding: 3 }}>
+      {opts.map((o) => {
+        const active = mode === o.key;
+        return (
+          <button
+            key={o.key}
+            onClick={() => pick(o.key)}
+            style={{
+              flex: 1,
+              padding: "9px 12px",
+              background: active ? theme.accent : "transparent",
+              color: active ? "#fff" : theme.text,
+              border: "none",
+              borderRadius: 7,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 13,
+              fontWeight: active ? 700 : 500,
+              opacity: active ? 1 : 0.75,
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
