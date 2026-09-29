@@ -282,6 +282,77 @@ async function openConversation(db, users, userId, body) {
   return { ok: true, conversation: row, existing: false };
 }
 
+
+async function getNextSong(db, index) {
+  const res = await db.listRows(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, [
+    Query.equal("status", "approved"),
+    Query.orderAsc("$createdAt"),
+    Query.limit(500),
+  ]);
+  const songs = res.rows || [];
+  if (songs.length === 0) return null;
+  return songs[index % songs.length];
+}
+
+async function radioNow(db, body) {
+  const now = Date.now();
+  const RADIO_ID = "current";
+  let state;
+
+  try {
+    state = await db.getRow(process.env.DATABASE_ID, process.env.RADIO_TABLE_ID, RADIO_ID);
+  } catch {
+    const first = await getNextSong(db, 0);
+    if (!first) return { ok: false, error: "no songs on the platform yet" };
+    state = await db.createRow(process.env.DATABASE_ID, process.env.RADIO_TABLE_ID, RADIO_ID, {
+      songId: first.$id,
+      startedAtMs: now,
+      durationMs: 0,
+      sequence: 0,
+    });
+  }
+
+  const clientSongId = body?.songId;
+  const clientDurationMs = Number(body?.durationMs) || 0;
+  if (
+    state.songId === clientSongId &&
+    (!state.durationMs || state.durationMs === 0) &&
+    clientDurationMs > 0
+  ) {
+    await db.updateRow(process.env.DATABASE_ID, process.env.RADIO_TABLE_ID, RADIO_ID, {
+      durationMs: Math.round(clientDurationMs),
+    });
+    state.durationMs = Math.round(clientDurationMs);
+  }
+
+  const elapsed = now - (state.startedAtMs || now);
+  const tooOld = state.durationMs > 0 && elapsed > state.durationMs + 2000;
+  const veryOld = elapsed > 12 * 60 * 1000;
+
+  if (tooOld || veryOld) {
+    const next = await getNextSong(db, (state.sequence || 0) + 1);
+    if (!next) return { ok: false, error: "no songs" };
+    await db.updateRow(process.env.DATABASE_ID, process.env.RADIO_TABLE_ID, RADIO_ID, {
+      songId: next.$id,
+      startedAtMs: now,
+      durationMs: 0,
+      sequence: (state.sequence || 0) + 1,
+    });
+    return { ok: true, song: next, elapsedMs: 0, durationMs: 0, sequence: (state.sequence || 0) + 1 };
+  }
+
+  const song = await db.getRow(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, state.songId).catch(() => null);
+  return {
+    ok: true,
+    song,
+    elapsedMs: elapsed,
+    durationMs: state.durationMs || 0,
+    sequence: state.sequence || 0,
+    serverNow: now,
+  };
+}
+
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -323,6 +394,7 @@ export default async ({ req, res, log, error }) => {
     if (action === "set-role") { const out = await setRole(teams, userId, body.role); return res.json(out, out.code || 200); }
     if (action === "submit-song") { const out = await submitSong(db, users, userId, userEmail, body); return res.json(out, out.code || 200); }
 
+    if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "request-message") { const out = await requestMessage(db, users, teams, userId, body); return res.json(out, out.code || 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }

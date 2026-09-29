@@ -13,6 +13,7 @@ import { ProfileView } from "./pages/ProfileView";
 import { MessagesView } from "./pages/MessagesView";
 import { ChatView } from "./pages/ChatView";
 import { SongPage } from "./pages/SongPage";
+import { RadioView } from "./pages/RadioView";
 import { ArtistPage } from "./pages/ArtistPage";
 import { AboutPage, TermsPage, PrivacyPage, TsCsPage, DeveloperPage } from "./pages/StaticPages";
 import { PlayerDock } from "./components/PlayerDock";
@@ -189,6 +190,7 @@ export default function App() {
             : <MessagesView currentUser={currentUser} onOpenChat={openChatFromAnywhere} />
         )} />
         <Route path="/profile" element={requireAuth(<ProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} onLogout={handleLogout} />)} />
+        <Route path="/radio" element={requireAuth(<RadioView />)} />
         <Route path="/song/:id" element={<SongPage currentUser={currentUser} onPlaySong={playSong} onPlay={playSong} />} />
         <Route path="/artist/:id" element={<ArtistPage currentUser={currentUser} onPlaySong={playSong} />} />
         <Route path="/about" element={<AboutPage />} />

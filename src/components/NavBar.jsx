@@ -107,11 +107,9 @@ export function NavBar({ isArtist, isAdmin, currentUser, onLogout, onStartRadio 
             </button>
           ))}
 
-          {onStartRadio && (
-            <button title="Start radio" onClick={onStartRadio} style={{ ...iconBtnStyle(false), color: theme.accent }}>
-              <Radio size={19} />
-            </button>
-          )}
+          <button title="Radio" onClick={() => go("/radio")} style={{ ...iconBtnStyle(isActive("/radio")), color: theme.accent }}>
+            <Radio size={19} />
+          </button>
 
           <div style={{ position: "relative", marginLeft: 6 }}>
             <button title={currentUser.name} onClick={() => setProfileOpen((v) => !v)} style={{ ...iconBtnStyle(profileOpen), padding: 2 }}>
@@ -174,14 +172,12 @@ export function NavBar({ isArtist, isAdmin, currentUser, onLogout, onStartRadio 
         </div>
 
         <div style={{ padding: "10px 20px", display: "flex", flexDirection: "column", gap: 2 }}>
-          {onStartRadio && (
-            <button
-              onClick={() => { onStartRadio(); setMobileOpen(false); }}
-              style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: theme.accent, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
-            >
-              <Radio size={18} /> Radio
-            </button>
-          )}
+          <button
+            onClick={() => go("/radio")}
+            style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: isActive("/radio") ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
+          >
+            <Radio size={18} /> Radio
+          </button>
           <button
             onClick={() => go("/profile")}
             style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: isActive("/profile") ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
