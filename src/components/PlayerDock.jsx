@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X, ListPlus, Plus, Info, Share2, MessageSquare, MoreVertical } from "lucide-react";
 import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID, PLAYLIST_SONGS_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "./ui";
@@ -12,6 +13,7 @@ function formatTime(sec) {
 }
 
 export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, currentUser, onClose, onOpenChat }) {
+  const navigate = useNavigate();
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -29,6 +31,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
   const [addBusy, setAddBusy] = useState(false);
   const [addedMsg, setAddedMsg] = useState("");
   const [showLyrics, setShowLyrics] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [msgBusy, setMsgBusy] = useState(false);
   const [msgNote, setMsgNote] = useState("");
 
@@ -62,6 +65,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
     setAddedMsg("");
     setShowMenu(false);
     setShowLyrics(false);
+    setShowAbout(false);
   }, [song?.$id]);
 
   useEffect(() => {
@@ -256,7 +260,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
                 boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
               }}
             >
-              <MenuItem icon={Info} label="About song" onClick={() => { setShowMenu(false); /* use modal */ }} />
+              <MenuItem icon={Info} label="About song" onClick={() => { setShowMenu(false); setShowAbout(true); }} />
               <MenuItem icon={MessageSquare} label="Message artist" onClick={messageArtist} />
               <MenuItem icon={Share2} label="Share" onClick={shareSong} />
               <MenuItem icon={ListPlus} label="Add to playlist" onClick={openAddMenu} />
@@ -407,6 +411,81 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
             </div>
           )}
 
+          {/* About overlay */}
+          {showAbout && (
+            <div
+              onClick={() => setShowAbout(false)}
+              style={{
+                position: "fixed", inset: 0, zIndex: 260,
+                background: "rgba(0,0,0,0.88)",
+                display: "flex", flexDirection: "column",
+                padding: "40px 24px 60px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>About song</div>
+                <button
+                  onClick={() => setShowAbout(false)}
+                  style={{ background: "none", border: "none", color: theme.text, cursor: "pointer", display: "flex", padding: 4 }}
+                >
+                  <X size={22} />
+                </button>
+              </div>
+
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{ flex: 1, overflowY: "auto", paddingBottom: 40 }}
+              >
+                <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 22 }}>
+                  <img
+                    src={fileUrl(song.coverArtField)}
+                    alt={song.title}
+                    style={{ width: 72, height: 72, borderRadius: 10, objectFit: "cover" }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 17, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song.title}</div>
+                    <button
+                      onClick={() => {
+                        setShowAbout(false);
+                        setExpanded(false);
+                        if (song.uploadedByUserId) navigate(`/artist/${song.uploadedByUserId}`);
+                      }}
+                      style={{
+                        background: "none", border: "none", padding: 0, marginTop: 4,
+                        cursor: "pointer", color: theme.accent, fontSize: 14,
+                        fontFamily: "inherit", textAlign: "left",
+                      }}
+                    >
+                      {song.artistName}
+                    </button>
+                  </div>
+                </div>
+
+                <AboutRow label="Genre" value={song.genre} />
+                <AboutRow label="Release type" value={song.releaseType} />
+                {song.albumName && <AboutRow label="Album" value={song.albumName} />}
+                <AboutRow label="Producer" value={song.producer} />
+                <AboutRow label="Songwriter" value={song.songWriter} />
+                {song.studio && <AboutRow label="Studio" value={song.studio} />}
+                {song.releasedAt && <AboutRow label="Released" value={new Date(song.releasedAt).toLocaleDateString()} />}
+                {song.$createdAt && <AboutRow label="Uploaded" value={new Date(song.$createdAt).toLocaleDateString()} />}
+
+                {song.description && (
+                  <div style={{ marginTop: 22, paddingTop: 20, borderTop: `1px solid ${theme.border}` }}>
+                    <div style={{ fontSize: 11.5, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Description</div>
+                    <div style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.9, whiteSpace: "pre-wrap" }}>{song.description}</div>
+                  </div>
+                )}
+
+                {likeCount > 0 && (
+                  <div style={{ marginTop: 22, fontSize: 12.5, opacity: 0.6, textAlign: "center" }}>
+                    ♥ {likeCount} {likeCount === 1 ? "like" : "likes"}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Lyrics overlay */}
           {showLyrics && (
             <div
@@ -459,5 +538,15 @@ function MenuItem({ icon: Icon, label, onClick }) {
     >
       <Icon size={16} /> {label}
     </button>
+  );
+}
+
+function AboutRow({ label, value }) {
+  if (!value) return null;
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, padding: "9px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ fontSize: 12, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 }}>{label}</div>
+      <div style={{ fontSize: 14, textAlign: "right", opacity: 0.95, wordBreak: "break-word" }}>{value}</div>
+    </div>
   );
 }
