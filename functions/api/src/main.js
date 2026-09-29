@@ -256,6 +256,9 @@ async function openConversation(db, users, userId, body) {
   if (!toUserId) return { error: "missing recipient", code: 400 };
   if (toUserId === userId) return { error: "cannot message yourself", code: 400 };
 
+  const me = await users.get(userId);
+  if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
+
   const toUser = await users.get(toUserId).catch(() => null);
   if (!toUser) return { error: "user not found", code: 404 };
 

@@ -113,11 +113,17 @@ export function MessagesView({ currentUser, onOpenChat }) {
               if (out?.conversation) {
                 setShowAdd(false);
                 onOpenChat(out.conversation);
+              } else if (out?.error === "email-not-verified") {
+                setError("Verify your email before messaging. Check your inbox for the link.");
               } else {
                 setError(out?.error || "Could not open chat");
               }
             } catch (e) {
-              setError(e.message);
+              if (e.code === "email-not-verified") {
+                setError("Verify your email before messaging. Check your inbox for the link.");
+              } else {
+                setError(e.message);
+              }
             }
           }}
         />

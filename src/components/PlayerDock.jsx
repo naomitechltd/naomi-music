@@ -178,7 +178,11 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
         onOpenChat(out.conversation);
         setExpanded(false);
         if (onClose) onClose();
-      } else setMsgNote(out?.error || "Could not open chat.");
+      } else if (out?.error === "email-not-verified") {
+        setMsgNote("Verify your email first.");
+      } else {
+        setMsgNote(out?.error || "Could not open chat.");
+      }
     } catch (e) { setMsgNote(e.message); }
     finally { setMsgBusy(false); setTimeout(() => setMsgNote(""), 3000); }
   };

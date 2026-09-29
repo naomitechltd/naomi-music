@@ -18,6 +18,7 @@ import { ArtistPage } from "./pages/ArtistPage";
 import { AboutPage, TermsPage, PrivacyPage, TsCsPage, DeveloperPage } from "./pages/StaticPages";
 import { PlayerDock } from "./components/PlayerDock";
 import { NavBar } from "./components/NavBar";
+import { EmailVerifyBanner } from "./components/EmailVerifyBanner";
 import { SplashScreen } from "./components/SplashScreen";
 import { theme } from "./components/ui";
 
@@ -184,6 +185,7 @@ export default function App() {
       {currentUser && (
         <NavBar isArtist={isArtist} isAdmin={isAdmin} currentUser={currentUser} onLogout={handleLogout} onStartRadio={startRadio} />
       )}
+      {currentUser && <EmailVerifyBanner currentUser={currentUser} />}
 
       <Routes>
         <Route path="/" element={requireAuth(<BrowseView currentUser={currentUser} onPlaySong={playSong} />)} />
