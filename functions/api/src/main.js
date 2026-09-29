@@ -66,57 +66,6 @@ async function submitSong(db, users, userId, userEmail, body) {
 
 /* ---------- Messaging ---------- */
 
-async function requestMessage(db, users, teams, userId, body) {
-  const { toUserId, toName, toEmail, intro = "" } = body;
-  if (!toUserId) return { error: "missing recipient", code: 400 };
-  if (toUserId === userId) return { error: "cannot message yourself", code: 400 };
-  if (intro.length > 500) return { error: "intro too long", code: 400 };
-
-  const me = await users.get(userId);
-  if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
-
-  const myRole = await getRole(teams, userId);
-  const theirRole = await getRole(teams, toUserId);
-  const listenerToArtist = myRole !== "artist" && myRole !== "admin" && (theirRole === "artist" || theirRole === "admin");
-  const artistToArtist = (myRole === "artist" || myRole === "admin") && (theirRole === "artist" || theirRole === "admin");
-  if (!listenerToArtist && !artistToArtist) {
-    return { error: "not allowed", code: 403 };
-  }
-
-  // Already a conversation?
-  const convRes = await db.listRows(process.env.DATABASE_ID, process.env.CONVERSATIONS_TABLE_ID, [
-    Query.contains("participants", [userId]),
-  ]).catch(() => ({ rows: [] }));
-  const hasConv = convRes.rows.some((c) => c.participants?.includes(toUserId));
-  if (hasConv) return { ok: true, note: "conversation exists" };
-
-  // Existing request?
-  const existing = await db.listRows(process.env.DATABASE_ID, process.env.REQUESTS_TABLE_ID, [
-    Query.equal("fromUserId", [userId]),
-    Query.equal("toUserId", [toUserId]),
-  ]).catch(() => ({ rows: [] }));
-  const prior = existing.rows[0];
-  if (prior) {
-    if (prior.status === "pending") return { error: "request already pending", code: 409 };
-    if (prior.status === "approved") return { ok: true, note: "already approved" };
-    if (prior.status === "declined" && prior.respondedAt) {
-      const days = (Date.now() - new Date(prior.respondedAt).getTime()) / 86400000;
-      if (days < 7) return { error: "cooldown", code: 429, daysLeft: Math.ceil(7 - days) };
-    }
-  }
-
-  const toUser = await users.get(toUserId).catch(() => null);
-  const row = await db.createRow(process.env.DATABASE_ID, process.env.REQUESTS_TABLE_ID, "unique()", {
-    fromUserId: userId,
-    toUserId,
-    fromName: me.name || "",
-    toName: toName || toUser?.name || "",
-    status: "pending",
-    intro: intro || "",
-  });
-  return { ok: true, requestId: row.$id };
-}
-
 async function listRequests(db, userId) {
   const incoming = await db.listRows(process.env.DATABASE_ID, process.env.REQUESTS_TABLE_ID, [
     Query.equal("toUserId", [userId]),
@@ -399,9 +348,7 @@ export default async ({ req, res, log, error }) => {
 
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
-    if (action === "request-message") { const out = await requestMessage(db, users, teams, userId, body); return res.json(out, out.code || 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }
-    if (action === "respond-request") { const out = await respondRequest(db, teams, userId, body); return res.json(out, out.code || 200); }
     if (action === "open-conversation") { const out = await openConversation(db, users, userId, body); return res.json(out, out.code || 200); }
     if (action === "list-conversations") { const out = await listConversations(db, userId); return res.json(out, 200); }
     if (action === "list-messages") { const out = await listMessages(db, userId, body); return res.json(out, out.code || 200); }
