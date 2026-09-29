@@ -5,18 +5,22 @@ import { functions, fileUrl } from "../lib/appwrite";
 import { theme } from "../components/ui";
 
 async function callRadioNow(opts = {}) {
-  const res = await functions.createExecution(
-    "api",
-    JSON.stringify({ action: "radio-now", ...opts }),
-    false
-  );
-  const raw =
-    res?.responseBody ??
-    res?.response ??
-    res?.data?.responseBody ??
-    res?.data?.response ??
-    "{}";
-  try { return JSON.parse(raw); } catch { return { ok: false }; }
+  try {
+    const res = await functions.createExecution(
+      "api",
+      JSON.stringify({ action: "radio-now", ...opts }),
+      false
+    );
+    const raw =
+      res?.responseBody ??
+      res?.response ??
+      res?.data?.responseBody ??
+      res?.data?.response ??
+      "{}";
+    return JSON.parse(raw);
+  } catch {
+    return { ok: false };
+  }
 }
 
 function formatTime(sec) {
@@ -29,8 +33,8 @@ function formatTime(sec) {
 export function RadioView() {
   const navigate = useNavigate();
   const audioRef = useRef(null);
-  const reloadingRef = useRef(false);   // true while we're mid-load
-  const targetRef = useRef({ elapsedMs: 0 }); // pending seek position
+  // Single source of truth for what we're currently playing
+  const cur = useRef({ songId: null, seq: null, seekMs: 0, needsLoad: false });
 
   const [song, setSong] = useState(null);
   const [playing, setPlaying] = useState(false);
@@ -39,124 +43,104 @@ export function RadioView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Load a specific song and seek to the right position once metadata is ready
-  const loadAndSeek = (songRow, sequence, elapsedMs) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    reloadingRef.current = true;
-    targetRef.current = { elapsedMs: Math.max(0, elapsedMs || 0) };
-
-    // Tag the audio element immediately so polling knows we're on this song
-    audio.dataset.songId = songRow.$id;
-    audio.dataset.seq = String(sequence || 0);
-
-    setSong(songRow);
-    setDuration(0);
-    setCurrent(0);
-
-    // Set the source — the loadedmetadata handler will seek + play
-    audio.src = fileUrl(songRow.audioField);
-  };
-
-  // Metadata handler — seek then play, clear the "reloading" flag
+  // Audio element listeners (bound once)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onMeta = async () => {
+    const onMeta = () => {
+      // Only act if we're expecting a fresh load
+      if (!cur.current.needsLoad) return;
+      cur.current.needsLoad = false;
+
       const d = audio.duration || 0;
       setDuration(d);
 
-      // Seek to target now that duration is known
-      const seekSec = Math.min(
-        targetRef.current.elapsedMs / 1000,
-        Math.max(0, d - 1)   // don't seek past the end
-      );
-      audio.currentTime = seekSec;
+      const target = Math.max(0, Math.min(cur.current.seekMs / 1000, Math.max(0, d - 1)));
+      try { audio.currentTime = target; } catch {}
 
-      try {
-        await audio.play();
-        setPlaying(true);
-      } catch { setPlaying(false); }
+      audio.play()
+        .then(() => setPlaying(true))
+        .catch(() => setPlaying(false));
 
-      reloadingRef.current = false;
-
-      // Report duration once, for the server scheduler
-      if (audio.dataset.songId) {
-        callRadioNow({ songId: audio.dataset.songId, durationMs: Math.round(d * 1000) });
+      // Report duration for the server scheduler (once per song)
+      if (cur.current.songId) {
+        callRadioNow({ songId: cur.current.songId, durationMs: Math.round(d * 1000) });
       }
     };
 
     const onTime = () => setCurrent(audio.currentTime);
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
-    const onEnded = () => setPlaying(false);
 
     audio.addEventListener("loadedmetadata", onMeta);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
-    audio.addEventListener("ended", onEnded);
     return () => {
       audio.removeEventListener("loadedmetadata", onMeta);
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
-      audio.removeEventListener("ended", onEnded);
     };
   }, []);
 
-  // Poll every 5s
+  // Poll the server
   useEffect(() => {
-    let cancelled = false;
+    let stopped = false;
+    let inFlight = false;
 
     const tick = async () => {
-      if (cancelled) return;
-      if (reloadingRef.current) return;   // don't interfere mid-load
-
-      const out = await callRadioNow();
-      if (cancelled) return;
-      if (!out.ok) {
-        setError(out.error || "Radio unavailable");
-        setLoading(false);
-        return;
-      }
-      setError("");
-
-      const audio = audioRef.current;
-      if (!audio || !out.song) return;
-
-      const serverSongId = out.song.$id;
-      const serverSeq = String(out.sequence ?? 0);
-
-      // Song changed → load it
-      if (audio.dataset.songId !== serverSongId) {
-        loadAndSeek(out.song, out.sequence, out.elapsedMs);
-        setLoading(false);
-        return;
-      }
-
-      // Same song but server advanced to next rotation (rare)
-      if (audio.dataset.seq !== serverSeq) {
-        loadAndSeek(out.song, out.sequence, out.elapsedMs);
-        return;
-      }
-
-      // Same song → drift correction only if audio is actually playing
-      if (!audio.paused && audio.readyState >= 2) {
-        const drift = audio.currentTime * 1000 - out.elapsedMs;
-        if (Math.abs(drift) > 2500) {
-          audio.currentTime = Math.max(0, out.elapsedMs / 1000);
+      if (stopped || inFlight) return;
+      inFlight = true;
+      try {
+        const out = await callRadioNow();
+        if (stopped) return;
+        if (!out || !out.ok || !out.song) {
+          if (out && out.error) setError(out.error);
+          return;
         }
-      }
+        setLoading(false);
+        setError("");
 
-      setLoading(false);
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const sId = out.song.$id;
+        const seq = out.sequence ?? 0;
+
+        // Different song OR sequence changed → load it
+        if (cur.current.songId !== sId || cur.current.seq !== seq) {
+          cur.current = {
+            songId: sId,
+            seq,
+            seekMs: out.elapsedMs || 0,
+            needsLoad: true,
+          };
+          setSong(out.song);
+          setDuration(0);
+          setCurrent(0);
+          // Force a fresh load even if the same src was cached
+          audio.src = fileUrl(out.song.audioField);
+          try { audio.load(); } catch {}
+          return;
+        }
+
+        // Same song — gentle drift correction
+        if (!audio.paused && audio.readyState >= 2 && out.durationMs > 0) {
+          const drift = audio.currentTime * 1000 - out.elapsedMs;
+          if (Math.abs(drift) > 4000) {
+            audio.currentTime = Math.max(0, out.elapsedMs / 1000);
+          }
+        }
+      } finally {
+        inFlight = false;
+      }
     };
 
     tick();
-    const id = setInterval(tick, 5000);
-    return () => { cancelled = true; clearInterval(id); };
+    const id = setInterval(tick, 4000);
+    return () => { stopped = true; clearInterval(id); };
   }, []);
 
   const toggle = () => {
@@ -170,7 +154,7 @@ export function RadioView() {
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 20px 120px", minHeight: "calc(100vh - 57px)" }}>
-      <audio ref={audioRef} preload="auto" crossOrigin="anonymous" />
+      <audio ref={audioRef} preload="auto" />
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 26 }}>
         <div
@@ -249,9 +233,7 @@ export function RadioView() {
           </div>
 
           <div style={{ textAlign: "center", fontSize: 11.5, opacity: 0.5, marginTop: 22, lineHeight: 1.6 }}>
-            Auto-synced every 5 seconds.
-            <br />
-            Tap play if your audio is paused.
+            Auto-synced every 4 seconds.
           </div>
         </>
       )}
