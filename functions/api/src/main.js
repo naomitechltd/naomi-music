@@ -73,14 +73,14 @@ async function requestMessage(db, users, teams, userId, body) {
   if (intro.length > 500) return { error: "intro too long", code: 400 };
 
   const me = await users.get(userId);
-  if (!me.emailVerification) return { error: "email-not-verified", code: 403, debug: { stage: "email-check", userId, email: me.email } };
+  if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
 
   const myRole = await getRole(teams, userId);
   const theirRole = await getRole(teams, toUserId);
   const listenerToArtist = myRole !== "artist" && myRole !== "admin" && (theirRole === "artist" || theirRole === "admin");
   const artistToArtist = (myRole === "artist" || myRole === "admin") && (theirRole === "artist" || theirRole === "admin");
   if (!listenerToArtist && !artistToArtist) {
-    return { error: "not allowed", code: 403, debug: { stage: "role-check", myRole, theirRole, userId, toUserId } };
+    return { error: "not allowed", code: 403 };
   }
 
   // Already a conversation?
