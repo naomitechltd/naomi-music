@@ -76,38 +76,6 @@ async function listRequests(db, userId) {
   return { ok: true, incoming: incoming.rows, outgoing: outgoing.rows };
 }
 
-async function respondRequest(db, teams, userId, body) {
-  const { requestId, decision } = body;
-  if (!requestId || !["approve", "decline"].includes(decision)) {
-    return { error: "invalid input", code: 400 };
-  }
-  const req = await db.getRow(process.env.DATABASE_ID, process.env.REQUESTS_TABLE_ID, requestId);
-  if (req.toUserId !== userId) return { error: "not yours", code: 403 };
-  if (req.status !== "pending") return { error: "already resolved", code: 409 };
-
-  const status = decision === "approve" ? "approved" : "declined";
-  await db.updateRow(process.env.DATABASE_ID, process.env.REQUESTS_TABLE_ID, requestId, {
-    status,
-    respondedAt: new Date().toISOString(),
-  });
-
-  if (decision === "approve") {
-    const [a, b] = [req.fromUserId, req.toUserId].sort();
-    await db.createRow(process.env.DATABASE_ID, process.env.CONVERSATIONS_TABLE_ID, "unique()", {
-      participants: [a, b],
-      userNames: [
-        a === req.fromUserId ? req.fromName : req.toName,
-        b === req.toUserId ? req.toName : req.fromName,
-      ],
-      lastMessage: "",
-      lastMessageAt: new Date().toISOString(),
-      unreadA: 0,
-      unreadB: 0,
-    });
-  }
-  return { ok: true, status };
-}
-
 async function listConversations(db, userId) {
   const res = await db.listRows(process.env.DATABASE_ID, process.env.CONVERSATIONS_TABLE_ID, [
     Query.contains("participants", [userId]),
@@ -218,7 +186,6 @@ async function openConversation(db, users, userId, body) {
   const existing = mine.rows.find((c) => c.participants?.includes(toUserId));
   if (existing) return { ok: true, conversation: existing, existing: true };
 
-  const me = await users.get(userId);
   const [a, b] = [userId, toUserId].sort();
   const nameFor = (id) => id === userId ? (me.name || me.email) : (toUser.name || toUser.email);
   const userNames = [nameFor(a), nameFor(b)];
