@@ -15,8 +15,16 @@ async function call(action, payload = {}) {
   let out = {};
   try { out = JSON.parse(raw); } catch {}
   if (out.error) {
-    const err = new Error(out.error);
+    let msg = out.error;
+    if (out.error === "rate-limited") {
+      const mins = Math.ceil((out.retryAfterMs || 0) / 60000);
+      msg = out.note || `Too many requests. Try again in ${mins} min.`;
+    } else if (out.error === "email-not-verified") {
+      msg = "Verify your email first.";
+    }
+    const err = new Error(msg);
     err.code = out.error;
+    err.retryAfterMs = out.retryAfterMs;
     throw err;
   }
   return out;

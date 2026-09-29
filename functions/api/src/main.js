@@ -39,6 +39,9 @@ async function setRole(teams, userId, newRole) {
 async function submitSong(db, users, userId, userEmail, body) {
   const user = await users.get(userId);
   if (!user.emailVerification) return { error: "email-not-verified", code: 403 };
+
+  const rl = await checkRateLimit(db, `upload:${userId}`, 10, 24 * 60 * 60 * 1000);
+  if (!rl.ok) return { error: "rate-limited", code: 429, retryAfterMs: rl.retryAfterMs, note: "Max 10 uploads per day." };
   const teams = new Teams(appwriteClient());
   const role = await getRole(teams, userId);
   if (role !== "artist" && role !== "admin") return { error: "forbidden", code: 403 };
@@ -63,6 +66,49 @@ async function submitSong(db, users, userId, userEmail, body) {
   });
   return { ok: true, id: row.$id };
 }
+
+
+async function checkRateLimit(db, key, limit, windowMs) {
+  const now = Date.now();
+  const rowId = key.replace(/[^a-zA-Z0-9_:-]/g, "_").slice(0, 36);
+  let row = null;
+
+  try {
+    row = await db.getRow(process.env.DATABASE_ID, process.env.RATE_LIMITS_TABLE_ID, rowId);
+  } catch {
+    row = null;
+  }
+
+  if (!row || !row.windowStart || now - row.windowStart > windowMs) {
+    // New window
+    if (row) {
+      await db.updateRow(process.env.DATABASE_ID, process.env.RATE_LIMITS_TABLE_ID, rowId, {
+        count: 1,
+        windowStart: now,
+      });
+    } else {
+      try {
+        await db.createRow(process.env.DATABASE_ID, process.env.RATE_LIMITS_TABLE_ID, rowId, {
+          key,
+          count: 1,
+          windowStart: now,
+        });
+      } catch {}
+    }
+    return { ok: true, remaining: limit - 1 };
+  }
+
+  if (row.count >= limit) {
+    const resetAt = row.windowStart + windowMs;
+    return { ok: false, resetAt, retryAfterMs: Math.max(0, resetAt - now) };
+  }
+
+  await db.updateRow(process.env.DATABASE_ID, process.env.RATE_LIMITS_TABLE_ID, rowId, {
+    count: row.count + 1,
+  });
+  return { ok: true, remaining: limit - row.count - 1 };
+}
+
 
 /* ---------- Messaging ---------- */
 
@@ -98,6 +144,9 @@ async function listMessages(db, userId, body) {
 }
 
 async function sendMessage(db, userId, body) {
+  const rl = await checkRateLimit(db, `msg:${userId}`, 60, 60 * 60 * 1000);
+  if (!rl.ok) return { error: "rate-limited", code: 429, retryAfterMs: rl.retryAfterMs, note: "Max 60 messages per hour." };
+
   const { conversationId, text = "", attachmentFileId = "", attachmentName = "", attachmentMime = "" } = body;
   if (!conversationId) return { error: "missing conversation", code: 400 };
   if (!text.trim() && !attachmentFileId) return { error: "empty message", code: 400 };
@@ -172,6 +221,9 @@ async function openConversation(db, users, userId, body) {
   const { toUserId } = body;
   if (!toUserId) return { error: "missing recipient", code: 400 };
   if (toUserId === userId) return { error: "cannot message yourself", code: 400 };
+
+  const rl = await checkRateLimit(db, `chat:${userId}`, 20, 60 * 60 * 1000);
+  if (!rl.ok) return { error: "rate-limited", code: 429, retryAfterMs: rl.retryAfterMs, note: "Max 20 new chats per hour." };
 
   const me = await users.get(userId);
   if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
