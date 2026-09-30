@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build with sitemap generation
+      - name: Build
         run: npm run build
         env:
           APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
@@ -34,8 +34,12 @@ jobs:
           VITE_APPWRITE_LIKES_TABLE_ID: ${{ secrets.VITE_APPWRITE_LIKES_TABLE_ID }}
           VITE_APPWRITE_PLAYLISTS_TABLE_ID: ${{ secrets.VITE_APPWRITE_PLAYLISTS_TABLE_ID }}
           VITE_APPWRITE_PLAYLIST_SONGS_TABLE_ID: ${{ secrets.VITE_APPWRITE_PLAYLIST_SONGS_TABLE_ID }}
+          VITE_APPWRITE_MESSAGES_TABLE_ID: ${{ secrets.VITE_APPWRITE_MESSAGES_TABLE_ID }}
+          VITE_APPWRITE_CONVERSATIONS_TABLE_ID: ${{ secrets.VITE_APPWRITE_CONVERSATIONS_TABLE_ID }}
+          VITE_APPWRITE_REPORTS_TABLE_ID: ${{ secrets.VITE_APPWRITE_REPORTS_TABLE_ID }}
+          VITE_APPWRITE_BLOCKS_TABLE_ID: ${{ secrets.VITE_APPWRITE_BLOCKS_TABLE_ID }}
 
-      - name: Publish to Cloudflare Pages
+      - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
