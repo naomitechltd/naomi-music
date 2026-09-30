@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { ChevronRight, Plus, Search, X } from "lucide-react";
 import { listConversations, openConversation } from "../lib/api";
-import { functions } from "../lib/appwrite";
+import { functions, client, DATABASE_ID, CONVERSATIONS_TABLE_ID, MESSAGES_TABLE_ID } from "../lib/appwrite";
 import { theme, inputStyle } from "../components/ui";
 
 async function listArtists() {
@@ -39,6 +39,24 @@ export function MessagesView({ currentUser, onOpenChat }) {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Realtime: refresh list when a conversation involving me changes
+  useEffect(() => {
+    let unsub;
+    try {
+      unsub = client.subscribe(
+        `databases.${DATABASE_ID}.collections.${CONVERSATIONS_TABLE_ID}.documents`,
+        (response) => {
+          const payload = response?.payload;
+          if (!payload?.participants?.includes(currentUser.$id)) return;
+          load({ quiet: true });
+        }
+      );
+    } catch (e) {
+      console.warn("realtime subscribe failed:", e.message);
+    }
+    return () => { if (unsub) unsub(); };
+  }, [currentUser.$id]);
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", padding: "40px 20px 100px" }}>

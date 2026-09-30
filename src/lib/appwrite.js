@@ -4,6 +4,7 @@ const client = new Client()
   .setEndpoint(import.meta.env.VITE_APPWRITE_ENDPOINT)
   .setProject(import.meta.env.VITE_APPWRITE_PROJECT_ID);
 
+export { client };
 export const account = new Account(client);
 export const tablesDB = new TablesDB(client);
 export const storage = new Storage(client);
@@ -15,6 +16,8 @@ export const SONGS_TABLE_ID = import.meta.env.VITE_APPWRITE_SONGS_TABLE_ID;
 export const LIKES_TABLE_ID = import.meta.env.VITE_APPWRITE_LIKES_TABLE_ID;
 export const PLAYLISTS_TABLE_ID = import.meta.env.VITE_APPWRITE_PLAYLISTS_TABLE_ID;
 export const PLAYLIST_SONGS_TABLE_ID = import.meta.env.VITE_APPWRITE_PLAYLIST_SONGS_TABLE_ID;
+export const MESSAGES_TABLE_ID = import.meta.env.VITE_APPWRITE_MESSAGES_TABLE_ID;
+export const CONVERSATIONS_TABLE_ID = import.meta.env.VITE_APPWRITE_CONVERSATIONS_TABLE_ID;
 
 export { ID, Query, Permission, Role };
 

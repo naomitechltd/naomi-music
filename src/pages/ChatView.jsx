@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ChevronLeft, Send, Paperclip, X, FileText } from "lucide-react";
-import { storage, ID, BUCKET_ID, Permission, Role, fileUrl } from "../lib/appwrite";
+import { client, storage, ID, BUCKET_ID, Permission, Role, fileUrl, DATABASE_ID, MESSAGES_TABLE_ID } from "../lib/appwrite";
 import { listMessages, sendMessage, markRead } from "../lib/api";
 import { theme, inputStyle } from "../components/ui";
 
@@ -34,9 +34,38 @@ export function ChatView({ conversation, currentUser, onBack }) {
 
   useEffect(() => { load(); }, [conversation.$id]);
 
+  // Realtime: subscribe to messages in this conversation
   useEffect(() => {
-    const t = setInterval(() => load({ quiet: true }), 6000);
-    return () => clearInterval(t);
+    let unsub;
+    try {
+      unsub = client.subscribe(
+        `databases.${DATABASE_ID}.collections.${MESSAGES_TABLE_ID}.documents`,
+        (response) => {
+          const events = response?.events || [];
+          const payload = response?.payload;
+          if (!payload) return;
+          if (payload.conversationId !== conversation.$id) return;
+
+          if (events.some((e) => e.endsWith(".create"))) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.$id === payload.$id)) return prev;
+              const next = [...prev, payload];
+              next.sort((a, b) => new Date(a.$createdAt) - new Date(b.$createdAt));
+              return next;
+            });
+            // Mark read for the just-received message
+            markRead(conversation.$id).catch(() => {});
+          } else if (events.some((e) => e.endsWith(".delete"))) {
+            setMessages((prev) => prev.filter((m) => m.$id !== payload.$id));
+          } else if (events.some((e) => e.endsWith(".update"))) {
+            setMessages((prev) => prev.map((m) => (m.$id === payload.$id ? payload : m)));
+          }
+        }
+      );
+    } catch (e) {
+      console.warn("realtime subscribe failed:", e.message);
+    }
+    return () => { if (unsub) unsub(); };
   }, [conversation.$id]);
 
   // Auto-scroll to bottom on new messages

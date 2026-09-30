@@ -1,0 +1,19 @@
+{
+  "name": "Naomi Music",
+  "short_name": "Naomi",
+  "description": "South African music platform — listen, upload, connect.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b0d",
+  "theme_color": "#7c5cff",
+  "icons": [
+    {
+      "src": "/icon-512.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
