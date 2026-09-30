@@ -51,6 +51,7 @@ export function NavBar({ isArtist, isAdmin, currentUser, onLogout, onStartRadio 
     ...(isArtist ? [{ path: "/upload", label: "Upload", icon: UploadCloud }] : []),
     ...(isArtist ? [{ path: "/mysongs", label: "My Songs", icon: ListMusic }] : []),
     ...(isAdmin ? [{ path: "/admin", label: "Admin", icon: ShieldCheck }] : []),
+    ...(isAdmin ? [{ path: "/admin/reports", label: "Reports", icon: ShieldCheck }] : []),
   ];
 
   const mobileNavItems = items.filter((it) => it.path !== "/");

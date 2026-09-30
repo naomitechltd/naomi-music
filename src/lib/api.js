@@ -41,6 +41,13 @@ export const listMessages = (conversationId) => call("list-messages", { conversa
 export const sendMessage = (payload) => call("send-message", payload);
 export const markRead = (conversationId) => call("mark-read", { conversationId });
 
+export const reportContent = (payload) => call("report", payload);
+export const listReports = () => call("list-reports");
+export const resolveReport = (reportId) => call("resolve-report", { reportId });
+export const blockUser = (blockedUserId) => call("block", { blockedUserId });
+export const unblockUser = (blockedUserId) => call("unblock", { blockedUserId });
+export const listBlocks = () => call("list-blocks");
+
 export const resendVerification = async () => {
   const { account } = await import("./appwrite");
   return account.createVerification(`${window.location.origin}/`);

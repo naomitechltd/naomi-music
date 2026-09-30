@@ -14,6 +14,7 @@ import { MessagesView } from "./pages/MessagesView";
 import { ChatView } from "./pages/ChatView";
 import { SongPage } from "./pages/SongPage";
 import { RadioView } from "./pages/RadioView";
+import { AdminReportsView } from "./pages/AdminReportsView";
 import { ArtistPage } from "./pages/ArtistPage";
 import { AboutPage, TermsPage, PrivacyPage, TsCsPage, DeveloperPage } from "./pages/StaticPages";
 import { PlayerDock } from "./components/PlayerDock";
@@ -193,6 +194,7 @@ export default function App() {
         <Route path="/upload" element={requireAuth(isArtist ? <UploadView currentUser={currentUser} onUploaded={() => { setRefreshKey((k) => k + 1); navigate("/mysongs"); }} /> : <Navigate to="/" />)} />
         <Route path="/mysongs" element={requireAuth(isArtist ? <MySongsView currentUser={currentUser} refreshKey={refreshKey} /> : <Navigate to="/" />)} />
         <Route path="/admin" element={requireAuth(isAdmin ? <AdminQueueView /> : <Navigate to="/" />)} />
+        <Route path="/admin/reports" element={requireAuth(isAdmin ? <AdminReportsView /> : <Navigate to="/" />)} />
         <Route path="/messages" element={requireAuth(
           openConversation
             ? <ChatView conversation={openConversation} currentUser={currentUser} onBack={() => setOpenConversation(null)} />

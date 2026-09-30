@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ChevronLeft, Send, Paperclip, X, FileText } from "lucide-react";
+import { ChevronLeft, Send, Paperclip, X, FileText, MoreVertical } from "lucide-react";
 import { client, storage, ID, BUCKET_ID, Permission, Role, fileUrl, DATABASE_ID, MESSAGES_TABLE_ID } from "../lib/appwrite";
-import { listMessages, sendMessage, markRead } from "../lib/api";
+import { listMessages, sendMessage, markRead, blockUser, unblockUser, listBlocks } from "../lib/api";
+import { ReportModal } from "../components/ReportModal";
 import { theme, inputStyle } from "../components/ui";
 
 const MAX_ATTACH_BYTES = 1048576;
@@ -13,6 +14,9 @@ export function ChatView({ conversation, currentUser, onBack }) {
   const [attachment, setAttachment] = useState(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [showMenu, setShowMenu] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const scrollRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -33,6 +37,15 @@ export function ChatView({ conversation, currentUser, onBack }) {
   };
 
   useEffect(() => { load(); }, [conversation.$id]);
+
+  useEffect(() => {
+    listBlocks()
+      .then((res) => {
+        const other = conversation.participants.find((p) => p !== currentUser.$id);
+        setBlocked((res.blocked || []).some((b) => b.userId === other));
+      })
+      .catch(() => {});
+  }, [conversation.$id]);
 
   // Realtime: subscribe to messages in this conversation
   useEffect(() => {
@@ -210,7 +223,54 @@ export function ChatView({ conversation, currentUser, onBack }) {
             {otherName}
           </div>
         </div>
+        <button
+          onClick={() => setShowMenu((v) => !v)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex", padding: 6 }}
+        >
+          <MoreVertical size={18} />
+        </button>
       </div>
+
+      {showMenu && (
+        <div
+          onClick={() => setShowMenu(false)}
+          style={{ position: "absolute", top: 56, right: 12, zIndex: 200, background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 10, padding: 6, minWidth: 180, boxShadow: "0 12px 30px rgba(0,0,0,0.5)" }}
+        >
+          <button
+            onClick={async () => {
+              setShowMenu(false);
+              const other = conversation.participants.find((p) => p !== currentUser.$id);
+              try {
+                if (blocked) {
+                  await unblockUser(other);
+                  setBlocked(false);
+                } else {
+                  await blockUser(other);
+                  setBlocked(true);
+                }
+              } catch (e) { setError(e.message); }
+            }}
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", background: "none", border: "none", color: theme.text, cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", textAlign: "left", borderRadius: 6 }}
+          >
+            {blocked ? "Unblock user" : "Block user"}
+          </button>
+          <button
+            onClick={() => { setShowMenu(false); setShowReport(true); }}
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", background: "none", border: "none", color: theme.danger, cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", textAlign: "left", borderRadius: 6 }}
+          >
+            Report user
+          </button>
+        </div>
+      )}
+
+      {showReport && (
+        <ReportModal
+          targetType="user"
+          targetId={conversation.participants.find((p) => p !== currentUser.$id)}
+          targetLabel={otherName}
+          onClose={() => setShowReport(false)}
+        />
+      )}
 
       {/* Messages — the ONLY scrollable area */}
       <div
@@ -346,12 +406,18 @@ export function ChatView({ conversation, currentUser, onBack }) {
         </div>
       )}
 
+      {blocked && (
+        <div style={{ flexShrink: 0, padding: "10px 16px", background: "rgba(255,107,107,0.12)", borderTop: `1px solid ${theme.border}`, fontSize: 12.5, color: theme.danger, textAlign: "center" }}>
+          This user is blocked. Unblock from the ⋯ menu to message them.
+        </div>
+      )}
+
       {/* Input bar — locked */}
       <div
         style={{
           flexShrink: 0,
           padding: "8px 12px calc(8px + env(safe-area-inset-bottom))",
-          display: "flex",
+          display: blocked ? "none" : "flex",
           alignItems: "flex-end",
           gap: 8,
           background: theme.bg,

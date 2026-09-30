@@ -158,6 +158,11 @@ async function sendMessage(db, userId, body) {
   const conv = await db.getRow(process.env.DATABASE_ID, process.env.CONVERSATIONS_TABLE_ID, conversationId);
   if (!conv.participants?.includes(userId)) return { error: "forbidden", code: 403 };
 
+  const otherUserId = conv.participants.find((p) => p !== userId);
+  if (otherUserId && await isBlocked(db, userId, otherUserId)) {
+    return { error: "blocked", code: 403, note: "You cannot message this user." };
+  }
+
   const row = await db.createRow(process.env.DATABASE_ID, process.env.MESSAGES_TABLE_ID, "unique()", {
     conversationId,
     senderUserId: userId,
@@ -224,6 +229,8 @@ async function openConversation(db, users, userId, body) {
 
   const rl = await checkRateLimit(db, `chat:${userId}`, 20, 60 * 60 * 1000);
   if (!rl.ok) return { error: "rate-limited", code: 429, retryAfterMs: rl.retryAfterMs, note: "Max 20 new chats per hour." };
+
+  if (await isBlocked(db, userId, toUserId)) return { error: "blocked", code: 403, note: "This user cannot be messaged." };
 
   const me = await users.get(userId);
   if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
@@ -324,6 +331,126 @@ async function radioNow(db, body) {
 }
 
 
+
+async function submitReport(db, users, userId, body) {
+  const { targetType, targetId, targetLabel = "", reason, notes = "" } = body;
+  if (!targetType || !targetId || !reason) return { error: "missing fields", code: 400 };
+  if (!["song", "user", "message"].includes(targetType)) return { error: "bad target type", code: 400 };
+  if (notes.length > 500) return { error: "notes too long", code: 400 };
+
+  const me = await users.get(userId);
+
+  // Prevent spam: one report per user per target
+  const existing = await db.listRows(process.env.DATABASE_ID, process.env.REPORTS_TABLE_ID, [
+    Query.equal("reporterUserId", [userId]),
+    Query.equal("targetId", [targetId]),
+  ]).catch(() => ({ rows: [] }));
+  if (existing.rows.length > 0) return { ok: true, note: "already-reported" };
+
+  const row = await db.createRow(process.env.DATABASE_ID, process.env.REPORTS_TABLE_ID, "unique()", {
+    reporterUserId: userId,
+    reporterEmail: me.email || "",
+    targetType,
+    targetId,
+    targetLabel,
+    reason,
+    notes,
+    status: "open",
+    resolvedByUserId: "",
+  });
+  return { ok: true, id: row.$id };
+}
+
+async function listReports(db, teams, userId) {
+  const role = await getRole(teams, userId);
+  if (role !== "admin") return { error: "forbidden", code: 403 };
+
+  const open = await db.listRows(process.env.DATABASE_ID, process.env.REPORTS_TABLE_ID, [
+    Query.equal("status", ["open"]),
+    Query.orderDesc("$createdAt"),
+    Query.limit(100),
+  ]);
+  const resolved = await db.listRows(process.env.DATABASE_ID, process.env.REPORTS_TABLE_ID, [
+    Query.equal("status", ["resolved"]),
+    Query.orderDesc("$createdAt"),
+    Query.limit(50),
+  ]);
+  return { ok: true, open: open.rows, resolved: resolved.rows };
+}
+
+async function resolveReport(db, teams, userId, body) {
+  const role = await getRole(teams, userId);
+  if (role !== "admin") return { error: "forbidden", code: 403 };
+  const { reportId } = body;
+  if (!reportId) return { error: "missing report", code: 400 };
+  await db.updateRow(process.env.DATABASE_ID, process.env.REPORTS_TABLE_ID, reportId, {
+    status: "resolved",
+    resolvedByUserId: userId,
+  });
+  return { ok: true };
+}
+
+async function blockUser(db, users, userId, body) {
+  const { blockedUserId } = body;
+  if (!blockedUserId) return { error: "missing user", code: 400 };
+  if (blockedUserId === userId) return { error: "cannot block yourself", code: 400 };
+
+  const existing = await db.listRows(process.env.DATABASE_ID, process.env.BLOCKS_TABLE_ID, [
+    Query.equal("blockerUserId", [userId]),
+    Query.equal("blockedUserId", [blockedUserId]),
+  ]).catch(() => ({ rows: [] }));
+  if (existing.rows.length > 0) return { ok: true, note: "already-blocked" };
+
+  await db.createRow(process.env.DATABASE_ID, process.env.BLOCKS_TABLE_ID, "unique()", {
+    blockerUserId: userId,
+    blockedUserId,
+  });
+  return { ok: true };
+}
+
+async function unblockUser(db, userId, body) {
+  const { blockedUserId } = body;
+  if (!blockedUserId) return { error: "missing user", code: 400 };
+  const rows = await db.listRows(process.env.DATABASE_ID, process.env.BLOCKS_TABLE_ID, [
+    Query.equal("blockerUserId", [userId]),
+    Query.equal("blockedUserId", [blockedUserId]),
+  ]).catch(() => ({ rows: [] }));
+  for (const r of rows.rows) {
+    await db.deleteRow(process.env.DATABASE_ID, process.env.BLOCKS_TABLE_ID, r.$id);
+  }
+  return { ok: true };
+}
+
+async function listBlocks(db, users, userId) {
+  const res = await db.listRows(process.env.DATABASE_ID, process.env.BLOCKS_TABLE_ID, [
+    Query.equal("blockerUserId", [userId]),
+    Query.limit(100),
+  ]);
+  const out = [];
+  for (const b of res.rows) {
+    try {
+      const u = await users.get(b.blockedUserId);
+      out.push({ id: b.$id, userId: u.$id, name: u.name || u.email, email: u.email });
+    } catch {}
+  }
+  return { ok: true, blocked: out };
+}
+
+async function isBlocked(db, a, b) {
+  // True if either direction of block exists
+  const r = await db.listRows(process.env.DATABASE_ID, process.env.BLOCKS_TABLE_ID, [
+    Query.equal("blockerUserId", [a]),
+    Query.equal("blockedUserId", [b]),
+  ]).catch(() => ({ rows: [] }));
+  if (r.rows.length > 0) return true;
+  const r2 = await db.listRows(process.env.DATABASE_ID, process.env.BLOCKS_TABLE_ID, [
+    Query.equal("blockerUserId", [b]),
+    Query.equal("blockedUserId", [a]),
+  ]).catch(() => ({ rows: [] }));
+  return r2.rows.length > 0;
+}
+
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -365,6 +492,12 @@ export default async ({ req, res, log, error }) => {
     if (action === "set-role") { const out = await setRole(teams, userId, body.role); return res.json(out, out.code || 200); }
     if (action === "submit-song") { const out = await submitSong(db, users, userId, userEmail, body); return res.json(out, out.code || 200); }
 
+    if (action === "report") { const out = await submitReport(db, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "list-reports") { const out = await listReports(db, teams, userId); return res.json(out, out.code || 200); }
+    if (action === "resolve-report") { const out = await resolveReport(db, teams, userId, body); return res.json(out, out.code || 200); }
+    if (action === "block") { const out = await blockUser(db, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "unblock") { const out = await unblockUser(db, userId, body); return res.json(out, out.code || 200); }
+    if (action === "list-blocks") { const out = await listBlocks(db, users, userId); return res.json(out, 200); }
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }

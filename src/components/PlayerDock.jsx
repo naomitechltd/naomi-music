@@ -4,6 +4,7 @@ import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown
 import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID, PLAYLIST_SONGS_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "./ui";
 import { openConversation } from "../lib/api";
+import { ReportModal } from "./ReportModal";
 
 function formatTime(sec) {
   if (!isFinite(sec) || sec < 0) return "0:00";
@@ -32,6 +33,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
   const [addedMsg, setAddedMsg] = useState("");
   const [showLyrics, setShowLyrics] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [msgBusy, setMsgBusy] = useState(false);
   const [msgNote, setMsgNote] = useState("");
 
@@ -268,6 +270,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
               <MenuItem icon={MessageSquare} label="Message artist" onClick={messageArtist} />
               <MenuItem icon={Share2} label="Share" onClick={shareSong} />
               <MenuItem icon={ListPlus} label="Add to playlist" onClick={openAddMenu} />
+              <MenuItem icon={Info} label="Report song" onClick={() => { setShowMenu(false); setShowReport(true); }} />
             </div>
           )}
 
@@ -514,6 +517,15 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
                 {song.lyrics || "No lyrics for this track."}
               </div>
             </div>
+          )}
+
+          {showReport && (
+            <ReportModal
+              targetType="song"
+              targetId={song.$id}
+              targetLabel={`${song.title} — ${song.artistName}`}
+              onClose={() => setShowReport(false)}
+            />
           )}
 
           {msgNote && (

@@ -18,6 +18,8 @@ export const PLAYLISTS_TABLE_ID = import.meta.env.VITE_APPWRITE_PLAYLISTS_TABLE_
 export const PLAYLIST_SONGS_TABLE_ID = import.meta.env.VITE_APPWRITE_PLAYLIST_SONGS_TABLE_ID;
 export const MESSAGES_TABLE_ID = import.meta.env.VITE_APPWRITE_MESSAGES_TABLE_ID;
 export const CONVERSATIONS_TABLE_ID = import.meta.env.VITE_APPWRITE_CONVERSATIONS_TABLE_ID;
+export const REPORTS_TABLE_ID = import.meta.env.VITE_APPWRITE_REPORTS_TABLE_ID;
+export const BLOCKS_TABLE_ID = import.meta.env.VITE_APPWRITE_BLOCKS_TABLE_ID;
 
 export { ID, Query, Permission, Role };
 
