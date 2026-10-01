@@ -20,6 +20,7 @@ import { AboutPage, TermsPage, PrivacyPage, TsCsPage, DeveloperPage } from "./pa
 import { PlayerDock } from "./components/PlayerDock";
 import { NavBar } from "./components/NavBar";
 import { EmailVerifyBanner } from "./components/EmailVerifyBanner";
+import { CompleteProfileBanner } from "./components/CompleteProfileBanner";
 import { SplashScreen } from "./components/SplashScreen";
 import { theme } from "./components/ui";
 
@@ -116,7 +117,15 @@ export default function App() {
         const user = await account.get();
         const role = await fetchMyRole();
         const prefs = await account.getPrefs();
-        setCurrentUser({ ...user, role, avatarFileId: prefs.avatarFileId || null });
+        setCurrentUser({
+          ...user,
+          role,
+          avatarFileId: prefs.avatarFileId || null,
+          phone: prefs.phone || "",
+          location: prefs.location || "",
+          studio: prefs.studio || "",
+          studioManager: prefs.studioManager || "",
+        });
       } catch {
         setCurrentUser(null);
       } finally {
@@ -125,7 +134,7 @@ export default function App() {
     })();
   }, []);
 
-  const handleAuth = async ({ mode, name, email, password, role, avatarFile }) => {
+  const handleAuth = async ({ mode, name, email, password, phone, location, studio, studioManager, role, avatarFile }) => {
     if (mode === "signup") {
       await account.create(ID.unique(), email, password, name);
       await account.createEmailPasswordSession(email, password);
@@ -137,6 +146,7 @@ export default function App() {
       if (role === "artist") {
         await setRole("artist");
       }
+      let avatarFileId = null;
       if (avatarFile) {
         const me = await account.get();
         const uploaded = await storage.createFile(
@@ -149,7 +159,17 @@ export default function App() {
             Permission.delete(Role.user(me.$id)),
           ]
         );
-        await account.updatePrefs({ avatarFileId: uploaded.$id });
+        avatarFileId = uploaded.$id;
+      }
+      // Save profile fields to prefs
+      const prefsUpdate = {};
+      if (avatarFileId) prefsUpdate.avatarFileId = avatarFileId;
+      if (phone) prefsUpdate.phone = phone;
+      if (location) prefsUpdate.location = location;
+      if (studio) prefsUpdate.studio = studio;
+      if (studioManager) prefsUpdate.studioManager = studioManager;
+      if (Object.keys(prefsUpdate).length > 0) {
+        await account.updatePrefs(prefsUpdate);
       }
     } else {
       // Clear any stale session before login (Appwrite blocks a new session
@@ -160,7 +180,15 @@ export default function App() {
     const user = await account.get();
     const resolvedRole = await fetchMyRole();
     const prefs = await account.getPrefs();
-    setCurrentUser({ ...user, role: resolvedRole, avatarFileId: prefs.avatarFileId || null });
+    setCurrentUser({
+      ...user,
+      role: resolvedRole,
+      avatarFileId: prefs.avatarFileId || null,
+      phone: prefs.phone || "",
+      location: prefs.location || "",
+      studio: prefs.studio || "",
+      studioManager: prefs.studioManager || "",
+    });
   };
 
   const openChatFromAnywhere = (conversation) => {
@@ -190,6 +218,7 @@ export default function App() {
         <NavBar isArtist={isArtist} isAdmin={isAdmin} currentUser={currentUser} onLogout={handleLogout} onStartRadio={startRadio} />
       )}
       {currentUser && <EmailVerifyBanner currentUser={currentUser} />}
+      {currentUser && <CompleteProfileBanner currentUser={currentUser} />}
 
       <Routes>
         <Route path="/" element={requireAuth(<BrowseView currentUser={currentUser} onPlaySong={playSong} />)} />

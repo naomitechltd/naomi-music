@@ -17,6 +17,11 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
   const [nameDraft, setNameDraft] = useState(currentUser.name || "");
 
   const [editingPass, setEditingPass] = useState(false);
+  const [phone, setPhone] = useState(currentUser.phone || "");
+  const [location, setLocation] = useState(currentUser.location || "");
+  const [studio, setStudio] = useState(currentUser.studio || "");
+  const [studioManager, setStudioManager] = useState(currentUser.studioManager || "");
+  const [contactBusy, setContactBusy] = useState(false);
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
 
@@ -55,6 +60,20 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
   const flash = (msg) => {
     setSuccess(msg);
     setTimeout(() => setSuccess(""), 2400);
+  };
+
+  const saveContact = async () => {
+    setContactBusy(true);
+    setError("");
+    try {
+      await account.updatePrefs({ phone, location, studio, studioManager });
+      setCurrentUser((u) => ({ ...u, phone, location, studio, studioManager }));
+      flash("Profile updated");
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setContactBusy(false);
+    }
   };
 
   const saveName = async () => {
@@ -180,6 +199,55 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
         )}
         <StatCard icon={Heart} label="Liked" value={stats.likes} accent="#ff6b6b" />
         <StatCard icon={ListMusic} label="Playlists" value={stats.playlists} />
+      </div>
+
+      {/* Contact info */}
+      <div style={{ marginTop: 28, background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 12, padding: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>Contact & Studio</div>
+
+        <Field label="Cellphone">
+          <input
+            type="tel"
+            style={inputStyle()}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="0821234567"
+          />
+        </Field>
+
+        <Field label="Location">
+          <input
+            style={inputStyle()}
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Johannesburg, GP"
+          />
+        </Field>
+
+        {isArtist && (
+          <>
+            <Field label="Studio">
+              <input
+                style={inputStyle()}
+                value={studio}
+                onChange={(e) => setStudio(e.target.value)}
+                placeholder="Moonlight Studios"
+              />
+            </Field>
+            <Field label="Studio manager">
+              <input
+                style={inputStyle()}
+                value={studioManager}
+                onChange={(e) => setStudioManager(e.target.value)}
+                placeholder="Optional"
+              />
+            </Field>
+          </>
+        )}
+
+        <Button onClick={saveContact} disabled={contactBusy}>
+          {contactBusy ? "Saving..." : "Save"}
+        </Button>
       </div>
 
       {/* Theme */}

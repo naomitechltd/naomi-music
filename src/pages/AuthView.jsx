@@ -1,24 +1,41 @@
 import React, { useState } from "react";
-import { Button, Field, ErrorNote, inputStyle } from "../components/ui";
+import { Link } from "react-router-dom";
+import { Button, Field, ErrorNote, inputStyle, theme } from "../components/ui";
 
 export function AuthView({ onAuth }) {
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [location, setLocation] = useState("");
+  const [studio, setStudio] = useState("");
+  const [studioManager, setStudioManager] = useState("");
   const [role, setRole] = useState("listener");
   const [avatarFile, setAvatarFile] = useState(null);
+  const [acceptTc, setAcceptTc] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     setError("");
-    if (!email || !password) { setError("Enter your email and password."); return; }
-    if (mode === "signup" && !name) { setError("Enter your name."); return; }
-    if (mode === "signup" && !avatarFile) { setError("Please choose a profile picture."); return; }
+    if (mode === "signup") {
+      if (!name || !email || !password || !phone || !location) {
+        setError("Fill in name, email, password, phone, and location.");
+        return;
+      }
+      if (!avatarFile) { setError("Please choose a profile picture."); return; }
+      if (!acceptTc) { setError("You must accept the Terms and Artist Rules."); return; }
+      if (role === "artist" && !studio) {
+        setError("Artists must provide their studio name (you can change it later).");
+        return;
+      }
+    } else {
+      if (!email || !password) { setError("Enter your email and password."); return; }
+    }
     setBusy(true);
     try {
-      await onAuth({ mode, name, email, password, role, avatarFile });
+      await onAuth({ mode, name, email, password, phone, location, studio, studioManager, role, avatarFile });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -27,7 +44,7 @@ export function AuthView({ onAuth }) {
   };
 
   return (
-    <div style={{ maxWidth: 380, margin: "0 auto", padding: "60px 20px" }}>
+    <div style={{ maxWidth: 420, margin: "0 auto", padding: "40px 20px 60px" }}>
       <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>
         {mode === "login" ? "Log in" : "Create an account"}
       </div>
@@ -37,13 +54,31 @@ export function AuthView({ onAuth }) {
 
       {mode === "signup" && (
         <>
-          <Field label="Name">
+          <Field label="Name *">
             <input style={inputStyle()} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Profile picture">
+          <Field label="Profile picture *">
             <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} />
           </Field>
-          <Field label="I am a...">
+          <Field label="Cellphone *">
+            <input
+              type="tel"
+              inputMode="tel"
+              placeholder="e.g. 0821234567"
+              style={inputStyle()}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </Field>
+          <Field label="Location *">
+            <input
+              placeholder="e.g. Johannesburg, GP"
+              style={inputStyle()}
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+          </Field>
+          <Field label="I am a... *">
             <div style={{ display: "flex", gap: 8 }}>
               {["listener", "artist"].map((r) => (
                 <button
@@ -54,9 +89,9 @@ export function AuthView({ onAuth }) {
                     flex: 1,
                     padding: "10px 0",
                     borderRadius: 4,
-                    border: `1px solid ${role === r ? "#7c5cff" : "#26262a"}`,
-                    background: role === r ? "#7c5cff" : "transparent",
-                    color: role === r ? "#fff" : "#f2f2f2",
+                    border: `1px solid ${role === r ? theme.accent : theme.border}`,
+                    background: role === r ? theme.accent : "transparent",
+                    color: role === r ? "#fff" : theme.text,
                     cursor: "pointer",
                     fontSize: 13,
                     textTransform: "capitalize",
@@ -68,15 +103,36 @@ export function AuthView({ onAuth }) {
               ))}
             </div>
           </Field>
+          {role === "artist" && (
+            <>
+              <Field label="Studio name *">
+                <input
+                  placeholder="e.g. Moonlight Studios"
+                  style={inputStyle()}
+                  value={studio}
+                  onChange={(e) => setStudio(e.target.value)}
+                />
+              </Field>
+              <Field label="Studio manager (optional)">
+                <input
+                  placeholder="Name of manager or producer-in-charge"
+                  style={inputStyle()}
+                  value={studioManager}
+                  onChange={(e) => setStudioManager(e.target.value)}
+                />
+              </Field>
+            </>
+          )}
         </>
       )}
 
-      <Field label="Email">
+      <Field label="Email *">
         <input type="email" style={inputStyle()} value={email} onChange={(e) => setEmail(e.target.value)} />
       </Field>
-      <Field label="Password">
+      <Field label="Password *">
         <input type="password" style={inputStyle()} value={password} onChange={(e) => setPassword(e.target.value)} />
       </Field>
+
       {mode === "login" && (
         <div style={{ marginTop: -6, marginBottom: 12, textAlign: "right" }}>
           <button
@@ -89,11 +145,31 @@ export function AuthView({ onAuth }) {
                 alert("Recovery email sent — check your inbox.");
               } catch (e) { setError(e.message); }
             }}
-            style={{ background: "none", border: "none", color: "#7c5cff", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5 }}
+            style={{ background: "none", border: "none", color: theme.accent, cursor: "pointer", fontFamily: "inherit", fontSize: 12.5 }}
           >
             Forgot password?
           </button>
         </div>
+      )}
+
+      {mode === "signup" && (
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 14, cursor: "pointer", fontSize: 12.5, lineHeight: 1.5 }}>
+          <input
+            type="checkbox"
+            checked={acceptTc}
+            onChange={(e) => setAcceptTc(e.target.checked)}
+            style={{ marginTop: 3, width: 16, height: 16, flexShrink: 0, accentColor: theme.accent }}
+          />
+          <span style={{ opacity: 0.85 }}>
+            I agree to the{" "}
+            <Link to="/terms" target="_blank" style={{ color: theme.accent }}>Terms of Use</Link>,{" "}
+            <Link to="/privacy" target="_blank" style={{ color: theme.accent }}>Privacy Policy</Link>
+            {role === "artist" && (
+              <>, and the <Link to="/tscs" target="_blank" style={{ color: theme.accent }}>Artist Rules</Link></>
+            )}
+            .
+          </span>
+        </label>
       )}
 
       <ErrorNote message={error} />
@@ -102,16 +178,18 @@ export function AuthView({ onAuth }) {
         {busy ? "Please wait..." : mode === "login" ? "Log in" : "Sign up"}
       </Button>
 
-      <div style={{ marginTop: 16, fontSize: 12.5, opacity: 0.7 }}>
+      <div style={{ marginTop: 16, fontSize: 12.5, opacity: 0.7, textAlign: "center" }}>
         {mode === "login" ? (
-          <>New here?{" "}
-            <button onClick={() => setMode("signup")} style={{ background: "none", border: "none", color: "#7c5cff", cursor: "pointer", fontFamily: "inherit" }}>
+          <>
+            New here?{" "}
+            <button onClick={() => { setMode("signup"); setError(""); }} style={{ background: "none", border: "none", color: theme.accent, cursor: "pointer", fontFamily: "inherit" }}>
               Create an account
             </button>
           </>
         ) : (
-          <>Already have an account?{" "}
-            <button onClick={() => setMode("login")} style={{ background: "none", border: "none", color: "#7c5cff", cursor: "pointer", fontFamily: "inherit" }}>
+          <>
+            Already have an account?{" "}
+            <button onClick={() => { setMode("login"); setError(""); }} style={{ background: "none", border: "none", color: theme.accent, cursor: "pointer", fontFamily: "inherit" }}>
               Log in
             </button>
           </>

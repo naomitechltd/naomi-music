@@ -23,6 +23,7 @@ export function UploadView({ currentUser, onUploaded }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [acceptTc, setAcceptTc] = useState(false);
 
   const submit = async () => {
     setError("");
@@ -32,6 +33,10 @@ export function UploadView({ currentUser, onUploaded }) {
     }
     if (releaseType === "album" && !albumName) {
       setError("Album name is required when release type is Album.");
+      return;
+    }
+    if (!acceptTc) {
+      setError("You must confirm your submission complies with the Artist Rules.");
       return;
     }
 
@@ -132,6 +137,20 @@ export function UploadView({ currentUser, onUploaded }) {
       <Field label="Audio file *">
         <input type="file" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} />
       </Field>
+
+      <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 14, marginBottom: 10, cursor: "pointer", fontSize: 12.5, lineHeight: 1.5 }}>
+        <input
+          type="checkbox"
+          checked={acceptTc}
+          onChange={(e) => setAcceptTc(e.target.checked)}
+          style={{ marginTop: 3, width: 16, height: 16, flexShrink: 0, accentColor: theme.accent }}
+        />
+        <span style={{ opacity: 0.85 }}>
+          I confirm this is my original work — no AI music, no AI cover art, no one else's content.
+          I have producer / studio consent, and I accept the{" "}
+          <a href="/tscs" target="_blank" rel="noopener noreferrer" style={{ color: theme.accent }}>Artist Rules</a>.
+        </span>
+      </label>
 
       <ErrorNote message={error} />
 
