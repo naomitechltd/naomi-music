@@ -48,18 +48,36 @@ async function submitSong(db, users, userId, userEmail, body) {
 
   const {
     title, artistName, description = "", studio = "",
-    producer, songWriter, releaseType, albumName = "",
-    genre, lyrics, coverArtField, audioField,
+    producer = "", songWriter = "", releaseType = "single", albumName = "",
+    genre, lyrics, coverArtField, audioField = "",
+    contentType = "song",
   } = body;
-  if (!title || !artistName || !producer || !songWriter || !genre || !lyrics || !coverArtField || !audioField) {
+
+  if (!["song", "poem"].includes(contentType)) return { error: "invalid contentType", code: 400 };
+  const isPoem = contentType === "poem";
+
+  if (!title || !artistName || !genre || !coverArtField) {
     return { error: "missing fields", code: 400 };
   }
-  if (!["single", "album"].includes(releaseType)) return { error: "bad release type", code: 400 };
-  if (releaseType === "album" && !albumName) return { error: "album name required", code: 400 };
+  if (isPoem) {
+    if (!lyrics) return { error: "poem needs body text", code: 400 };
+  } else {
+    if (!lyrics || !producer || !songWriter || !audioField) {
+      return { error: "missing fields", code: 400 };
+    }
+    if (!["single", "album"].includes(releaseType)) return { error: "bad release type", code: 400 };
+    if (releaseType === "album" && !albumName) return { error: "album name required", code: 400 };
+  }
 
   const row = await db.createRow(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, "unique()", {
-    title, artistName, description, studio, producer, songWriter,
-    releaseType, albumName, genre, lyrics, coverArtField, audioField,
+    title, artistName, description, studio,
+    producer: isPoem ? "" : producer,
+    songWriter: isPoem ? artistName : songWriter,
+    releaseType: isPoem ? "single" : releaseType,
+    albumName: isPoem ? "" : albumName,
+    genre, lyrics, coverArtField,
+    audioField: isPoem ? "" : audioField,
+    contentType,
     status: "pending",
     uploadedByEmail: userEmail || user.email || "",
     uploadedByUserId: userId,
@@ -267,7 +285,8 @@ async function getNextSong(db, index) {
     Query.orderAsc("$createdAt"),
     Query.limit(500),
   ]);
-  const songs = res.rows || [];
+  // Radio only plays songs (skip poems which have no audio)
+  const songs = (res.rows || []).filter((s) => (s.contentType || "song") === "song");
   if (songs.length === 0) return null;
   return songs[index % songs.length];
 }

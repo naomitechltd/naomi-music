@@ -35,6 +35,7 @@ export function BrowseView({ currentUser, onPlaySong }) {
   const [view, setView] = useState(() => localStorage.getItem(VIEW_KEY) || "grid");
   const [activeGenre, setActiveGenre] = useState(null);
   const [activeMood, setActiveMood] = useState(null);
+  const [typeFilter, setTypeFilter] = useState("all");
 
   useEffect(() => { localStorage.setItem(VIEW_KEY, view); }, [view]);
 
@@ -83,6 +84,10 @@ export function BrowseView({ currentUser, onPlaySong }) {
   const filtered = useMemo(() => {
     let list = songs;
 
+    // Type filter
+    if (typeFilter === "song") list = list.filter((s) => (s.contentType || "song") === "song");
+    else if (typeFilter === "poem") list = list.filter((s) => s.contentType === "poem");
+
     // Genre filter
     if (activeGenre) list = list.filter((s) => (s.genre || "Other") === activeGenre);
 
@@ -111,7 +116,7 @@ export function BrowseView({ currentUser, onPlaySong }) {
     }
 
     return list;
-  }, [songs, activeGenre, activeMood, query, likes]);
+  }, [songs, activeGenre, activeMood, query, likes, typeFilter]);
 
   const clearFilters = () => { setActiveGenre(null); setActiveMood(null); };
 
@@ -137,6 +142,33 @@ export function BrowseView({ currentUser, onPlaySong }) {
           <ViewBtn icon={List} active={view === "list"} onClick={() => setView("list")} title="List" />
           <ViewBtn icon={ListIcon} active={view === "compact"} onClick={() => setView("compact")} title="Compact" />
         </div>
+      </div>
+
+      {/* Type chips */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+        {[
+          { key: "all", label: "All" },
+          { key: "song", label: "Songs" },
+          { key: "poem", label: "Poems" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTypeFilter(t.key)}
+            style={{
+              padding: "7px 16px",
+              borderRadius: 20,
+              background: typeFilter === t.key ? theme.accent : "transparent",
+              color: typeFilter === t.key ? "#fff" : theme.text,
+              border: `1px solid ${typeFilter === t.key ? theme.accent : theme.border}`,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 12.5,
+              fontWeight: 600,
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* Mood cards */}
@@ -220,22 +252,39 @@ export function BrowseView({ currentUser, onPlaySong }) {
       {/* Grid view */}
       {view === "grid" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 18 }}>
-          {filtered.map((s, i) => (
-            <Link
-              key={s.$id}
-              to={`/song/${s.$id}`}
-              onClick={(e) => { e.preventDefault(); onPlaySong(filtered, i); }}
-              style={{ textDecoration: "none", color: "inherit", display: "block" }}
-            >
-              <img
-                src={fileUrl(s.coverArtField)}
-                alt={s.title}
-                style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 6, background: theme.bgRaised, border: `1px solid ${theme.border}` }}
-              />
-              <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-              <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.artistName}</div>
-            </Link>
-          ))}
+          {filtered.map((s, i) => {
+            const isPoem = s.contentType === "poem";
+            return (
+              <Link
+                key={s.$id}
+                to={`/song/${s.$id}`}
+                onClick={(e) => {
+                  if (isPoem) return; // poems navigate to their page
+                  e.preventDefault();
+                  onPlaySong(filtered.filter((x) => (x.contentType || "song") === "song"), i);
+                }}
+                style={{ textDecoration: "none", color: "inherit", display: "block", position: "relative" }}
+              >
+                <img
+                  src={fileUrl(s.coverArtField)}
+                  alt={s.title}
+                  style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 6, background: theme.bgRaised, border: `1px solid ${theme.border}` }}
+                />
+                {isPoem && (
+                  <div style={{
+                    position: "absolute", top: 6, right: 6,
+                    background: "rgba(0,0,0,0.7)", color: "#fff",
+                    fontSize: 10, fontWeight: 700, padding: "2px 7px",
+                    borderRadius: 10, letterSpacing: "0.04em",
+                  }}>
+                    POEM
+                  </div>
+                )}
+                <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.artistName}</div>
+              </Link>
+            );
+          })}
         </div>
       )}
 

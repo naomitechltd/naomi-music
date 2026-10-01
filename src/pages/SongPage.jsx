@@ -66,7 +66,10 @@ export function SongPage({ currentUser, onPlaySong, onPlay }) {
     return <div style={{ padding: 40, textAlign: "center", opacity: 0.6 }}>This song isn't available.</div>;
   }
 
+  const isPoem = song.contentType === "poem";
+
   const play = () => {
+    if (isPoem) return;
     onPlaySong([song], 0);
   };
 
@@ -104,7 +107,7 @@ export function SongPage({ currentUser, onPlaySong, onPlay }) {
           </div>
 
           <div style={{ display: "flex", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
-            <Button onClick={play}><Play size={15} /> Play</Button>
+            {!isPoem && <Button onClick={play}><Play size={15} /> Play</Button>}
             <Button variant="outline" onClick={messageArtist}><MessageSquare size={15} /> Message</Button>
             <Button variant="outline" onClick={share}><Share2 size={15} /> Share</Button>
           </div>
@@ -112,9 +115,10 @@ export function SongPage({ currentUser, onPlaySong, onPlay }) {
       </div>
 
       <div style={{ marginTop: 34, paddingTop: 22, borderTop: `1px solid ${theme.border}`, fontSize: 14, lineHeight: 1.7, opacity: 0.9 }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>Credits</div>
-        <div>Producer: {song.producer}</div>
-        <div>Songwriter: {song.songWriter}</div>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>{isPoem ? "Poem details" : "Credits"}</div>
+        {!isPoem && <div>Producer: {song.producer}</div>}
+        {!isPoem && <div>Songwriter: {song.songWriter}</div>}
+        {isPoem && <div>Author: {song.songWriter || song.artistName}</div>}
         {song.studio && <div>Studio: {song.studio}</div>}
       </div>
 
@@ -126,7 +130,7 @@ export function SongPage({ currentUser, onPlaySong, onPlay }) {
 
       {song.lyrics && (
         <div style={{ marginTop: 30, paddingTop: 22, borderTop: `1px solid ${theme.border}` }}>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>Lyrics</div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>{isPoem ? "Poem" : "Lyrics"}</div>
           <div style={{ fontSize: 14, lineHeight: 1.9, opacity: 0.85, whiteSpace: "pre-wrap" }}>
             {song.lyrics}
           </div>
