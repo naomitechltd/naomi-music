@@ -3,7 +3,7 @@ import {
   storage, ID, BUCKET_ID, Permission, Role,
 } from "../lib/appwrite";
 import { submitSong } from "../lib/api";
-import { Button, Field, ErrorNote, inputStyle } from "../components/ui";
+import { Button, Field, ErrorNote, inputStyle, theme } from "../components/ui";
 
 const GENRES = ["Afrobeats", "Amapiano", "Hip Hop", "R&B", "Pop", "Gospel", "House", "Kwaito", "Jazz", "Other"];
 
