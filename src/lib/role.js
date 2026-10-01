@@ -14,11 +14,9 @@ export async function fetchMyRole() {
       res?.data?.responseBody ??
       res?.data?.response ??
       "{}";
-    try { window.__lastRoleRaw = raw; } catch {}
     const { role } = JSON.parse(raw);
     return role || "listener";
   } catch (e) {
-    try { window.__lastRoleRaw = "ERROR: " + e.message; } catch {}
     return "listener";
   }
 }
