@@ -152,6 +152,9 @@ export default function App() {
         await account.updatePrefs({ avatarFileId: uploaded.$id });
       }
     } else {
+      // Clear any stale session before login (Appwrite blocks a new session
+      // when one is already active in the same browser)
+      try { await account.deleteSession("current"); } catch {}
       await account.createEmailPasswordSession(email, password);
     }
     const user = await account.get();
