@@ -146,8 +146,20 @@ export function TermsPage() {
       <P>
         If you're blocked for a serious violation, you may apply for reinstatement within 30 days.
         Reinstatement requires: (a) a written apology and admission, and (b) settlement of a
-        <strong> restoration fine of R500</strong>, payable via an invoice we'll send. If reinstatement
-        is not completed within 30 days, the account is permanently terminated with no further appeal.
+        <strong> restoration fee of R500</strong>, payable by email invoice. If reinstatement is not
+        completed within 30 days, the account is permanently terminated.
+      </P>
+
+      <H2>5. Permanent termination</H2>
+      <P>
+        If your account is permanently terminated, the following identifiers are banned from the
+        platform: your email address, your artist name, and your cell phone number (if on file).
+        Terminated users are reduced to listener-only access — they cannot upload, message, or comment.
+      </P>
+      <P>
+        Their previously approved work is hidden from public view. If the terminated user pays a
+        <strong> R30/month hosting fee</strong>, their catalogue stays published. Otherwise, after
+        30 days, the songs are permanently removed from our database.
       </P>
       <Warn>
         Fines are only levied for deliberate violations of our "no other people's work" and
@@ -278,12 +290,11 @@ export function TsCsPage() {
       <H2>4. Producer and studio sign-off</H2>
       <P>
         Every submission must list the producer(s) and, if applicable, the studio manager. Before we
-        approve your work, we may contact them to confirm they consented to the release. This is for
+        approve your work, we will contact them to confirm they consented to the release. This is for
         legal purposes and to prevent disputes.
       </P>
       <P>
-        If we can't reach them or they deny consent, the submission is declined. Provide accurate contact
-        details in your submission metadata or we can't complete the review.
+        If we can't reach them or they deny consent, the submission is declined.
       </P>
 
       <H2>5. No licensed music</H2>
@@ -307,7 +318,7 @@ export function TsCsPage() {
           producer didn't consent) → <strong>one-month account block</strong>.
         </Li>
         <Li>
-          <strong>Repeat offenses</strong> → permanent termination, no reinstatement.
+          <strong>Repeat offenses</strong> → permanent termination. See below.
         </Li>
       </Ul>
 
@@ -324,7 +335,7 @@ export function TsCsPage() {
         block, not a pass.
       </Warn>
 
-      <H2>Reinstatement</H2>
+      <H2>Reinstatement (first offense)</H2>
       <P>
         If you're blocked for a serious violation, you have <strong>30 days</strong> to apply for
         reinstatement. To be reinstated you must:
@@ -332,12 +343,45 @@ export function TsCsPage() {
       <Ul>
         <Li>Acknowledge the violation in writing</Li>
         <Li>Provide proof of corrective action (deleted the work, obtained proper permission, etc.)</Li>
-        <Li>Settle a <strong>restoration fine of R500</strong> against an invoice we'll send you</Li>
+        <Li>Settle a <strong>restoration fee of R500</strong> against an invoice we'll send you by email</Li>
       </Ul>
       <P>
-        If reinstatement isn't completed within 30 days, the account is permanently terminated. No
-        further appeal.
+        Payment is currently arranged by email. Send proof of payment to the contact address below.
+        If reinstatement isn't completed within 30 days, the account is permanently terminated.
       </P>
+
+      <H2>Permanent termination</H2>
+      <P>
+        If your account is permanently terminated, the following are permanently banned from Naomi Music:
+      </P>
+      <Ul>
+        <Li>Your email address</Li>
+        <Li>Your artist name</Li>
+        <Li>Your cell phone number (if on file)</Li>
+      </Ul>
+      <P>
+        A terminated user is reduced to <strong>listener-only access</strong>: they can listen to music
+        but cannot upload, message other users, or comment on songs. Attempting to create a new account
+        to bypass termination will result in that new account being removed as well.
+      </P>
+
+      <H2>Existing work after termination</H2>
+      <P>
+        If you're terminated, your previously approved work becomes <strong>inaccessible to the public
+        </strong> — it's removed from Browse, from search, and from the sitemap. Your files remain on
+        our servers for <strong>30 days</strong>, during which time you can pay a <strong>R30/month
+        hosting fee</strong> to keep your catalogue published. Payment is arranged by email.
+      </P>
+      <P>
+        If the hosting fee isn't paid within 30 days of termination, your songs are permanently removed
+        from our database.
+      </P>
+      <Warn>
+        <strong>Why the hosting fee?</strong> We're not a label — we're a promotional platform. When
+        we host your music, it costs us money (storage, bandwidth, review time). If you're removed for
+        breaking our rules, we don't want to keep paying for that. Artists in good standing never pay
+        this fee.
+      </Warn>
 
       <H2>What we promote</H2>
       <P>
