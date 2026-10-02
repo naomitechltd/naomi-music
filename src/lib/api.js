@@ -48,6 +48,12 @@ export const blockUser = (blockedUserId) => call("block", { blockedUserId });
 export const unblockUser = (blockedUserId) => call("unblock", { blockedUserId });
 export const listBlocks = () => call("list-blocks");
 
+export const submitRating = (songId, value) => call("submit-rating", { songId, value });
+export const listRatings = (songId) => call("list-ratings", { songId });
+export const submitComment = (songId, body) => call("submit-comment", { songId, body });
+export const listComments = (songId, limit) => call("list-comments", { songId, limit });
+export const deleteComment = (commentId) => call("delete-comment", { commentId });
+
 export const resendVerification = async () => {
   const { account } = await import("./appwrite");
   return account.createVerification(`${window.location.origin}/`);

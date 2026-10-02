@@ -495,6 +495,112 @@ async function isBlocked(db, a, b) {
 }
 
 
+
+async function submitRating(db, users, userId, body) {
+  const { songId, value } = body;
+  if (!songId) return { error: "missing song", code: 400 };
+  const v = Number(value);
+  if (!Number.isInteger(v) || v < 1 || v > 5) return { error: "rating must be 1-5", code: 400 };
+
+  const me = await users.get(userId);
+  if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
+
+  const rl = await checkRateLimit(db, `rate:${userId}`, 30, 60 * 60 * 1000);
+  if (!rl.ok) return { error: "rate-limited", code: 429, retryAfterMs: rl.retryAfterMs, note: "Max 30 ratings per hour." };
+
+  const existing = await db.listRows(process.env.DATABASE_ID, process.env.RATINGS_TABLE_ID, [
+    Query.equal("userId", [userId]),
+    Query.equal("songId", [songId]),
+  ]);
+  if (existing.rows.length > 0) {
+    await db.updateRow(process.env.DATABASE_ID, process.env.RATINGS_TABLE_ID, existing.rows[0].$id, { value: v });
+    return { ok: true, updated: true };
+  }
+  await db.createRow(process.env.DATABASE_ID, process.env.RATINGS_TABLE_ID, "unique()", {
+    userId,
+    userEmail: me.email || "",
+    songId,
+    value: v,
+  });
+  return { ok: true };
+}
+
+async function listRatings(db, userId, body) {
+  const { songId } = body;
+  if (!songId) return { error: "missing song", code: 400 };
+  const res = await db.listRows(process.env.DATABASE_ID, process.env.RATINGS_TABLE_ID, [
+    Query.equal("songId", [songId]),
+    Query.limit(1000),
+  ]);
+  const rows = res.rows || [];
+  const total = rows.length;
+  const sum = rows.reduce((a, r) => a + (r.value || 0), 0);
+  const average = total > 0 ? sum / total : 0;
+  const mine = userId ? rows.find((r) => r.userId === userId) : null;
+  return { ok: true, average, total, myRating: mine ? mine.value : 0 };
+}
+
+async function submitComment(db, users, userId, body) {
+  const { songId, body: text } = body;
+  if (!songId || !text) return { error: "missing fields", code: 400 };
+  const trimmed = String(text).trim();
+  if (!trimmed) return { error: "empty comment", code: 400 };
+  if (trimmed.length > 500) return { error: "comment too long (max 500)", code: 400 };
+
+  const me = await users.get(userId);
+  if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
+
+  const rl = await checkRateLimit(db, `comment:${userId}`, 15, 60 * 60 * 1000);
+  if (!rl.ok) return { error: "rate-limited", code: 429, retryAfterMs: rl.retryAfterMs, note: "Max 15 comments per hour." };
+
+  const prefs = await users.getPrefs(userId).catch(() => ({}));
+  const avatarFileId = prefs?.avatarFileId || "";
+
+  const row = await db.createRow(process.env.DATABASE_ID, process.env.COMMENTS_TABLE_ID, "unique()", {
+    userId,
+    userName: me.name || me.email || "User",
+    userAvatarId: avatarFileId,
+    songId,
+    body: trimmed,
+    reportCount: 0,
+  });
+  return {
+    ok: true,
+    comment: {
+      $id: row.$id,
+      userId,
+      userName: me.name || me.email || "User",
+      userAvatarId: avatarFileId,
+      songId,
+      body: trimmed,
+      $createdAt: row.$createdAt,
+    },
+  };
+}
+
+async function listComments(db, body) {
+  const { songId, limit = 100 } = body;
+  if (!songId) return { error: "missing song", code: 400 };
+  const res = await db.listRows(process.env.DATABASE_ID, process.env.COMMENTS_TABLE_ID, [
+    Query.equal("songId", [songId]),
+    Query.orderDesc("$createdAt"),
+    Query.limit(Math.min(Number(limit) || 100, 200)),
+  ]);
+  return { ok: true, comments: res.rows };
+}
+
+async function deleteComment(db, teams, userId, body) {
+  const { commentId } = body;
+  if (!commentId) return { error: "missing comment", code: 400 };
+  const row = await db.getRow(process.env.DATABASE_ID, process.env.COMMENTS_TABLE_ID, commentId);
+  const role = await getRole(teams, userId);
+  const isAdmin = role === "admin";
+  if (row.userId !== userId && !isAdmin) return { error: "forbidden", code: 403 };
+  await db.deleteRow(process.env.DATABASE_ID, process.env.COMMENTS_TABLE_ID, commentId);
+  return { ok: true };
+}
+
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -542,6 +648,11 @@ export default async ({ req, res, log, error }) => {
     if (action === "block") { const out = await blockUser(db, users, userId, body); return res.json(out, out.code || 200); }
     if (action === "unblock") { const out = await unblockUser(db, userId, body); return res.json(out, out.code || 200); }
     if (action === "list-blocks") { const out = await listBlocks(db, users, userId); return res.json(out, 200); }
+    if (action === "submit-rating") { const out = await submitRating(db, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "list-ratings") { const out = await listRatings(db, userId, body); return res.json(out, out.code || 200); }
+    if (action === "submit-comment") { const out = await submitComment(db, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "list-comments") { const out = await listComments(db, body); return res.json(out, out.code || 200); }
+    if (action === "delete-comment") { const out = await deleteComment(db, teams, userId, body); return res.json(out, out.code || 200); }
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }

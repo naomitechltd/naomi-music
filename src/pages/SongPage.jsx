@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Play, Heart, MessageSquare, Share2 } from "lucide-react";
 import { tablesDB, DATABASE_ID, SONGS_TABLE_ID, fileUrl } from "../lib/appwrite";
 import { theme, Button } from "../components/ui";
+import { RatingsAndComments } from "../components/RatingsAndComments";
 
 export function SongPage({ currentUser, onPlaySong, onPlay }) {
   const { id } = useParams();
@@ -136,6 +137,8 @@ export function SongPage({ currentUser, onPlaySong, onPlay }) {
           </div>
         </div>
       )}
+
+      <RatingsAndComments songId={song.$id} currentUser={currentUser} />
     </div>
   );
 }

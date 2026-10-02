@@ -20,6 +20,8 @@ export const MESSAGES_TABLE_ID = import.meta.env.VITE_APPWRITE_MESSAGES_TABLE_ID
 export const CONVERSATIONS_TABLE_ID = import.meta.env.VITE_APPWRITE_CONVERSATIONS_TABLE_ID;
 export const REPORTS_TABLE_ID = import.meta.env.VITE_APPWRITE_REPORTS_TABLE_ID;
 export const BLOCKS_TABLE_ID = import.meta.env.VITE_APPWRITE_BLOCKS_TABLE_ID;
+export const RATINGS_TABLE_ID = import.meta.env.VITE_APPWRITE_RATINGS_TABLE_ID;
+export const COMMENTS_TABLE_ID = import.meta.env.VITE_APPWRITE_COMMENTS_TABLE_ID;
 
 export { ID, Query, Permission, Role };
 

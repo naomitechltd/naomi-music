@@ -38,6 +38,8 @@ jobs:
           VITE_APPWRITE_CONVERSATIONS_TABLE_ID: ${{ secrets.VITE_APPWRITE_CONVERSATIONS_TABLE_ID }}
           VITE_APPWRITE_REPORTS_TABLE_ID: ${{ secrets.VITE_APPWRITE_REPORTS_TABLE_ID }}
           VITE_APPWRITE_BLOCKS_TABLE_ID: ${{ secrets.VITE_APPWRITE_BLOCKS_TABLE_ID }}
+          VITE_APPWRITE_RATINGS_TABLE_ID: ${{ secrets.VITE_APPWRITE_RATINGS_TABLE_ID }}
+          VITE_APPWRITE_COMMENTS_TABLE_ID: ${{ secrets.VITE_APPWRITE_COMMENTS_TABLE_ID }}
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
