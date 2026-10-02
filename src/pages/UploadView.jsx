@@ -6,6 +6,18 @@ import {
 import { Button, Field, ErrorNote, inputStyle, theme } from "../components/ui";
 
 const GENRES = ["Afrobeats", "Amapiano", "Hip Hop", "R&B", "Pop", "Gospel", "House", "Kwaito", "Jazz", "Other"];
+const POEM_TYPES = [
+  "Love & Romance",
+  "Life & Reflection",
+  "Praise & Worship",
+  "Struggle & Pain",
+  "Heritage & Culture",
+  "Nature",
+  "Inspirational",
+  "Storytelling",
+  "Spoken Word",
+  "Other",
+];
 
 const TYPES = [
   { key: "song", label: "Song", icon: Music },
@@ -68,7 +80,7 @@ export function UploadView({ currentUser, onUploaded }) {
 
       const coverUpload = await storage.createFile(BUCKET_ID, ID.unique(), coverFile, filePerms);
       let audioFileId = "";
-      if (!isPoem && audioFile) {
+      if (audioFile) {
         const audioUpload = await storage.createFile(BUCKET_ID, ID.unique(), audioFile, filePerms);
         audioFileId = audioUpload.$id;
       }
@@ -119,7 +131,7 @@ export function UploadView({ currentUser, onUploaded }) {
               key={t.key}
               type="button"
               disabled={disabled}
-              onClick={() => !disabled && setContentType(t.key)}
+              onClick={() => { if (!disabled) { setContentType(t.key); setGenre(t.key === "poem" ? POEM_TYPES[0] : GENRES[0]); } }}
               style={{
                 flex: 1,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -203,9 +215,9 @@ export function UploadView({ currentUser, onUploaded }) {
             </>
           )}
 
-          <Field label="Genre *">
+          <Field label={isPoem ? "Poem type *" : "Genre *"}>
             <select style={inputStyle()} value={genre} onChange={(e) => setGenre(e.target.value)}>
-              {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
+              {(isPoem ? POEM_TYPES : GENRES).map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
           </Field>
 
@@ -223,11 +235,9 @@ export function UploadView({ currentUser, onUploaded }) {
             <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
           </Field>
 
-          {!isPoem && (
-            <Field label="Audio file *">
-              <input type="file" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} />
-            </Field>
-          )}
+          <Field label={isPoem ? "Audio recording (optional)" : "Audio file *"}>
+            <input type="file" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} />
+          </Field>
 
           <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 14, marginBottom: 10, cursor: "pointer", fontSize: 12.5, lineHeight: 1.5 }}>
             <input

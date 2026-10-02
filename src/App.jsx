@@ -207,7 +207,7 @@ export default function App() {
     return <SplashScreen phase={splashPhase} />;
   }
 
-  const isArtist = currentUser?.role === "artist" || currentUser?.role === "admin";
+  const isArtist = currentUser?.role === "artist" || currentUser?.role === "poet" || currentUser?.role === "admin";
   const isAdmin = currentUser?.role === "admin";
 
   const requireAuth = (element) => currentUser ? element : <AuthView onAuth={handleAuth} />;

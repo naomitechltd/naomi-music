@@ -8,30 +8,55 @@ function appwriteClient() {
 }
 
 async function getRole(teams, userId) {
-  console.log("[debug] getRole called userId=" + userId);
   const admins = await teams.listMemberships(process.env.ADMINS_TEAM_ID);
-  console.log("[debug] admins team size=" + admins.memberships.length + " ids=" + admins.memberships.map((m) => m.userId).join("|"));
-  if (admins.memberships.some((m) => m.userId === userId)) { console.log("[debug] matched admin"); return "admin"; }
+  if (admins.memberships.some((m) => m.userId === userId)) return "admin";
 
   const artists = await teams.listMemberships(process.env.ARTISTS_TEAM_ID);
-  console.log("[debug] artists team size=" + artists.memberships.length + " ids=" + artists.memberships.map((m) => m.userId).join("|"));
-  if (artists.memberships.some((m) => m.userId === userId)) { console.log("[debug] matched artist"); return "artist"; }
+  if (artists.memberships.some((m) => m.userId === userId)) return "artist";
 
-  console.log("[debug] no match, returning listener");
+  if (process.env.POETS_TEAM_ID) {
+    try {
+      const poets = await teams.listMemberships(process.env.POETS_TEAM_ID);
+      if (poets.memberships.some((m) => m.userId === userId)) return "poet";
+    } catch {}
+  }
+
   return "listener";
 }
 
 async function setRole(teams, userId, newRole) {
-  if (newRole !== "artist" && newRole !== "listener") return { error: "invalid role", code: 400 };
+  if (newRole !== "artist" && newRole !== "poet" && newRole !== "listener") {
+    return { error: "invalid role", code: 400 };
+  }
   const admins = await teams.listMemberships(process.env.ADMINS_TEAM_ID);
   if (admins.memberships.some((m) => m.userId === userId)) return { ok: true, note: "already admin" };
+
   const artists = await teams.listMemberships(process.env.ARTISTS_TEAM_ID);
-  const existing = artists.memberships.find((m) => m.userId === userId) || null;
+  const inArtists = artists.memberships.find((m) => m.userId === userId) || null;
+
+  let inPoets = null;
+  if (process.env.POETS_TEAM_ID) {
+    try {
+      const poets = await teams.listMemberships(process.env.POETS_TEAM_ID);
+      inPoets = poets.memberships.find((m) => m.userId === userId) || null;
+    } catch {}
+  }
+
   if (newRole === "artist") {
-    if (existing) return { ok: true, note: "already artist" };
-    await teams.createMembership(process.env.ARTISTS_TEAM_ID, ["none"], undefined, userId);
-  } else if (existing) {
-    await teams.deleteMembership(process.env.ARTISTS_TEAM_ID, existing.$id);
+    if (!inArtists) await teams.createMembership(process.env.ARTISTS_TEAM_ID, ["none"], undefined, userId);
+    if (inPoets && process.env.POETS_TEAM_ID) {
+      try { await teams.deleteMembership(process.env.POETS_TEAM_ID, inPoets.$id); } catch {}
+    }
+  } else if (newRole === "poet") {
+    if (!inPoets && process.env.POETS_TEAM_ID) {
+      await teams.createMembership(process.env.POETS_TEAM_ID, ["none"], undefined, userId);
+    }
+    if (inArtists) {
+      try { await teams.deleteMembership(process.env.ARTISTS_TEAM_ID, inArtists.$id); } catch {}
+    }
+  } else {
+    if (inArtists) try { await teams.deleteMembership(process.env.ARTISTS_TEAM_ID, inArtists.$id); } catch {}
+    if (inPoets && process.env.POETS_TEAM_ID) try { await teams.deleteMembership(process.env.POETS_TEAM_ID, inPoets.$id); } catch {}
   }
   return { ok: true };
 }
@@ -44,7 +69,7 @@ async function submitSong(db, users, userId, userEmail, body) {
   if (!rl.ok) return { error: "rate-limited", code: 429, retryAfterMs: rl.retryAfterMs, note: "Max 10 uploads per day." };
   const teams = new Teams(appwriteClient());
   const role = await getRole(teams, userId);
-  if (role !== "artist" && role !== "admin") return { error: "forbidden", code: 403 };
+  if (role !== "artist" && role !== "poet" && role !== "admin") return { error: "forbidden", code: 403 };
 
   const {
     title, artistName, description = "", studio = "",

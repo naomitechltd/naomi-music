@@ -80,7 +80,7 @@ export function AuthView({ onAuth }) {
           </Field>
           <Field label="I am a... *">
             <div style={{ display: "flex", gap: 8 }}>
-              {["listener", "artist"].map((r) => (
+              {["listener", "artist", "poet"].map((r) => (
                 <button
                   key={r}
                   type="button"
