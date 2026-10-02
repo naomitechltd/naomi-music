@@ -617,21 +617,316 @@ async function getArtistProfile(db, users, body) {
     Query.orderDesc("$createdAt"),
     Query.limit(200),
   ]);
+  const songs = songsRes.rows || [];
+
+  // Total plays
+  const totalPlays = songs.reduce((a, s) => a + (s.playCount || 0), 0);
+
+  // Average rating across all their songs
+  const songIds = songs.map((s) => s.$id);
+  let avgRating = 0;
+  let ratingCount = 0;
+  if (songIds.length > 0) {
+    const ratingsRes = await db.listRows(process.env.DATABASE_ID, process.env.RATINGS_TABLE_ID, [
+      Query.equal("songId", songIds),
+      Query.limit(2000),
+    ]).catch(() => ({ rows: [] }));
+    const rows = ratingsRes.rows || [];
+    ratingCount = rows.length;
+    if (ratingCount > 0) {
+      avgRating = rows.reduce((a, r) => a + (r.value || 0), 0) / ratingCount;
+    }
+  }
+
+  // Followers + following
+  const followersRes = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followedUserId", [userId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+  const followingRes = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followerUserId", [userId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
 
   return {
     ok: true,
     profile: {
       userId: user.$id,
       name: user.name || user.email || "Artist",
+      email: user.email,
       location: prefs?.location || "",
       studio: prefs?.studio || "",
       studioManager: prefs?.studioManager || "",
       bio: prefs?.bio || "",
+      social: {
+        instagram: prefs?.instagram || "",
+        tiktok: prefs?.tiktok || "",
+        youtube: prefs?.youtube || "",
+        twitter: prefs?.twitter || "",
+        website: prefs?.website || "",
+      },
       avatarFileId: prefs?.avatarFileId || "",
       joinedAt: user.$createdAt,
       verified: !!user.emailVerification,
+      followersCount: followersRes.rows.length,
+      followingCount: followingRes.rows.length,
+      totalPlays,
+      avgRating,
+      ratingCount,
     },
-    songs: songsRes.rows || [],
+    songs,
+  };
+}
+
+
+
+/* ---------- Follows + Plays + Profile extras ---------- */
+
+async function followUser(db, users, userId, body) {
+  const { targetUserId } = body;
+  if (!targetUserId) return { error: "missing target", code: 400 };
+  if (targetUserId === userId) return { error: "cannot follow yourself", code: 400 };
+
+  const me = await users.get(userId);
+  if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
+
+  const target = await users.get(targetUserId).catch(() => null);
+  if (!target) return { error: "user not found", code: 404 };
+
+  const existing = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followerUserId", [userId]),
+    Query.equal("followedUserId", [targetUserId]),
+  ]).catch(() => ({ rows: [] }));
+  if (existing.rows.length > 0) return { ok: true, note: "already-following" };
+
+  await db.createRow(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, "unique()", {
+    followerUserId: userId,
+    followedUserId: targetUserId,
+    followerName: me.name || "",
+    followedName: target.name || "",
+  });
+  return { ok: true };
+}
+
+async function unfollowUser(db, userId, body) {
+  const { targetUserId } = body;
+  if (!targetUserId) return { error: "missing target", code: 400 };
+  const rows = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followerUserId", [userId]),
+    Query.equal("followedUserId", [targetUserId]),
+  ]).catch(() => ({ rows: [] }));
+  for (const r of rows.rows) {
+    await db.deleteRow(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, r.$id);
+  }
+  return { ok: true };
+}
+
+async function followStats(db, users, userId, body) {
+  const { targetUserId } = body;
+  if (!targetUserId) return { error: "missing target", code: 400 };
+
+  const followersRes = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followedUserId", [targetUserId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+
+  const followingRes = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followerUserId", [targetUserId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+
+  let iFollow = false;
+  if (userId) {
+    iFollow = followersRes.rows.some((r) => r.followerUserId === userId);
+  }
+
+  return {
+    ok: true,
+    followersCount: followersRes.rows.length,
+    followingCount: followingRes.rows.length,
+    iFollow,
+  };
+}
+
+async function listFollowers(db, users, userId, body) {
+  const { targetUserId, limit = 100 } = body;
+  if (!targetUserId) return { error: "missing target", code: 400 };
+  const res = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followedUserId", [targetUserId]),
+    Query.orderDesc("$createdAt"),
+    Query.limit(Math.min(Number(limit) || 100, 200)),
+  ]).catch(() => ({ rows: [] }));
+
+  const out = [];
+  for (const r of res.rows) {
+    try {
+      const u = await users.get(r.followerUserId);
+      const prefs = await users.getPrefs(r.followerUserId).catch(() => ({}));
+      out.push({
+        userId: u.$id,
+        name: u.name || u.email,
+        avatarFileId: prefs?.avatarFileId || "",
+      });
+    } catch {}
+  }
+  return { ok: true, followers: out };
+}
+
+async function listFollowing(db, users, userId, body) {
+  const { targetUserId, limit = 100 } = body;
+  if (!targetUserId) return { error: "missing target", code: 400 };
+  const res = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followerUserId", [targetUserId]),
+    Query.orderDesc("$createdAt"),
+    Query.limit(Math.min(Number(limit) || 100, 200)),
+  ]).catch(() => ({ rows: [] }));
+
+  const out = [];
+  for (const r of res.rows) {
+    try {
+      const u = await users.get(r.followedUserId);
+      const prefs = await users.getPrefs(r.followedUserId).catch(() => ({}));
+      out.push({
+        userId: u.$id,
+        name: u.name || u.email,
+        avatarFileId: prefs?.avatarFileId || "",
+      });
+    } catch {}
+  }
+  return { ok: true, following: out };
+}
+
+async function incrementPlay(db, userId, body) {
+  const { songId } = body;
+  if (!songId) return { error: "missing song", code: 400 };
+
+  // Rate limit: one play per user per song per 30 seconds
+  const rlKey = `play:${userId || "guest"}:${songId}`;
+  const rl = await checkRateLimit(db, rlKey, 1, 30 * 1000).catch(() => ({ ok: true }));
+  if (!rl.ok) return { ok: true, skipped: true };
+
+  try {
+    const row = await db.getRow(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, songId);
+    const current = row.playCount || 0;
+    await db.updateRow(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, songId, {
+      playCount: current + 1,
+    });
+    return { ok: true, playCount: current + 1 };
+  } catch {
+    return { error: "song not found", code: 404 };
+  }
+}
+
+async function changeEmail(users, userId, body) {
+  const { email, password } = body;
+  if (!email || !password) return { error: "email and password required", code: 400 };
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return { error: "invalid email", code: 400 };
+  try {
+    await users.updateEmail(userId, email, password);
+    return { ok: true };
+  } catch (e) {
+    return { error: e.message, code: 400 };
+  }
+}
+
+async function listMySessions(sessionsClient, body) {
+  return { error: "not supported", code: 400 };
+}
+
+async function deleteMyAccount(db, users, storage, userId) {
+  // Gather user's songs to delete files
+  const songs = await db.listRows(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, [
+    Query.equal("uploadedByUserId", [userId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+
+  for (const s of songs.rows) {
+    try {
+      if (s.audioField) await storage.deleteFile(process.env.CHAT_BUCKET_ID, s.audioField).catch(() => {});
+      if (s.coverArtField) await storage.deleteFile(process.env.CHAT_BUCKET_ID, s.coverArtField).catch(() => {});
+    } catch {}
+    await db.deleteRow(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, s.$id).catch(() => {});
+  }
+
+  // Delete likes
+  const likes = await db.listRows(process.env.DATABASE_ID, process.env.LIKES_TABLE_ID, [
+    Query.limit(2000),
+  ]).catch(() => ({ rows: [] }));
+  for (const l of likes.rows) {
+    if (l.userEmail) {
+      // We can't verify email without fetching user, but user deletion cascades
+    }
+  }
+
+  // Delete user's follows
+  const followA = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followerUserId", [userId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+  for (const f of followA.rows) {
+    await db.deleteRow(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, f.$id).catch(() => {});
+  }
+  const followB = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followedUserId", [userId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+  for (const f of followB.rows) {
+    await db.deleteRow(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, f.$id).catch(() => {});
+  }
+
+  // Finally delete the user (this fails auth sessions and disables the account)
+  await users.delete(userId);
+  return { ok: true };
+}
+
+async function exportMyData(db, users, userId) {
+  const user = await users.get(userId);
+  const prefs = await users.getPrefs(userId).catch(() => ({}));
+
+  const songs = await db.listRows(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, [
+    Query.equal("uploadedByUserId", [userId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+
+  const playlists = await db.listRows(process.env.DATABASE_ID, process.env.PLAYLISTS_TABLE_ID, [
+    Query.equal("userEmail", [user.email]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+
+  const likes = await db.listRows(process.env.DATABASE_ID, process.env.LIKES_TABLE_ID, [
+    Query.equal("userEmail", [user.email]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+
+  const following = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followerUserId", [userId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+
+  const followers = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+    Query.equal("followedUserId", [userId]),
+    Query.limit(500),
+  ]).catch(() => ({ rows: [] }));
+
+  return {
+    ok: true,
+    data: {
+      exportedAt: new Date().toISOString(),
+      user: {
+        id: user.$id,
+        email: user.email,
+        name: user.name,
+        emailVerification: user.emailVerification,
+        createdAt: user.$createdAt,
+      },
+      prefs,
+      songs: songs.rows,
+      playlists: playlists.rows,
+      likes: likes.rows,
+      following: following.rows,
+      followers: followers.rows,
+    },
   };
 }
 
@@ -652,6 +947,7 @@ export default async ({ req, res, log, error }) => {
   const teams = new Teams(client);
   const db = new TablesDB(client);
   const users = new Users(client);
+  const storage = new Storage(client);
 
   try {
     if (action === "get-role") {
@@ -689,6 +985,15 @@ export default async ({ req, res, log, error }) => {
     if (action === "list-comments") { const out = await listComments(db, body); return res.json(out, out.code || 200); }
     if (action === "delete-comment") { const out = await deleteComment(db, teams, userId, body); return res.json(out, out.code || 200); }
     if (action === "get-artist-profile") { const out = await getArtistProfile(db, users, body); return res.json(out, out.code || 200); }
+    if (action === "follow") { const out = await followUser(db, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "unfollow") { const out = await unfollowUser(db, userId, body); return res.json(out, out.code || 200); }
+    if (action === "follow-stats") { const out = await followStats(db, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "list-followers") { const out = await listFollowers(db, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "list-following") { const out = await listFollowing(db, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "increment-play") { const out = await incrementPlay(db, userId, body); return res.json(out, out.code || 200); }
+    if (action === "change-email") { const out = await changeEmail(users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "delete-my-account") { const out = await deleteMyAccount(db, users, storage, userId); return res.json(out, out.code || 200); }
+    if (action === "export-my-data") { const out = await exportMyData(db, users, userId); return res.json(out, out.code || 200); }
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }

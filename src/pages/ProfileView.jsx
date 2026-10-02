@@ -22,6 +22,11 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
   const [studio, setStudio] = useState(currentUser.studio || "");
   const [studioManager, setStudioManager] = useState(currentUser.studioManager || "");
   const [bio, setBio] = useState(currentUser.bio || "");
+  const [instagram, setInstagram] = useState(currentUser.instagram || "");
+  const [tiktok, setTiktok] = useState(currentUser.tiktok || "");
+  const [youtube, setYoutube] = useState(currentUser.youtube || "");
+  const [twitter, setTwitter] = useState(currentUser.twitter || "");
+  const [website, setWebsite] = useState(currentUser.website || "");
   const [contactBusy, setContactBusy] = useState(false);
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
@@ -67,8 +72,8 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
     setContactBusy(true);
     setError("");
     try {
-      await account.updatePrefs({ phone, location, studio, studioManager, bio });
-      setCurrentUser((u) => ({ ...u, phone, location, studio, studioManager, bio }));
+      await account.updatePrefs({ phone, location, studio, studioManager, bio, instagram, tiktok, youtube, twitter, website });
+      setCurrentUser((u) => ({ ...u, phone, location, studio, studioManager, bio, instagram, tiktok, youtube, twitter, website }));
       flash("Profile updated");
     } catch (e) {
       setError(e.message);
@@ -247,6 +252,22 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
             onChange={(e) => setBio(e.target.value)}
             placeholder="Tell listeners about yourself…"
           />
+        </Field>
+
+        <Field label="Instagram (handle or URL)">
+          <input style={inputStyle()} value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@you" />
+        </Field>
+        <Field label="TikTok (handle or URL)">
+          <input style={inputStyle()} value={tiktok} onChange={(e) => setTiktok(e.target.value)} placeholder="@you" />
+        </Field>
+        <Field label="YouTube (channel or URL)">
+          <input style={inputStyle()} value={youtube} onChange={(e) => setYoutube(e.target.value)} placeholder="https://youtube.com/@you" />
+        </Field>
+        <Field label="Twitter / X (handle or URL)">
+          <input style={inputStyle()} value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="@you" />
+        </Field>
+        <Field label="Website">
+          <input style={inputStyle()} value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" />
         </Field>
 
         <Button onClick={saveContact} disabled={contactBusy}>

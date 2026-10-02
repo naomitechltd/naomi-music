@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X, ListPlus, Plus, Info, Share2, MessageSquare, MoreVertical } from "lucide-react";
 import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID, PLAYLIST_SONGS_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "./ui";
-import { openConversation } from "../lib/api";
+import { openConversation, incrementPlay } from "../lib/api";
 import { ReportModal } from "./ReportModal";
 
 function formatTime(sec) {
@@ -63,6 +63,8 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
   useEffect(() => {
     if (!song || !audioRef.current) return;
     audioRef.current.play().then(() => setPlaying(true)).catch(() => {});
+    // Count the play (server rate-limits to 1 per 30s per user per song)
+    incrementPlay(song.$id).catch(() => {});
     setShowAddMenu(false);
     setAddedMsg("");
     setShowMenu(false);

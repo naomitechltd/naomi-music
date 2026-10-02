@@ -126,6 +126,11 @@ export default function App() {
           studio: prefs.studio || "",
           studioManager: prefs.studioManager || "",
           bio: prefs.bio || "",
+          instagram: prefs.instagram || "",
+          tiktok: prefs.tiktok || "",
+          youtube: prefs.youtube || "",
+          twitter: prefs.twitter || "",
+          website: prefs.website || "",
         });
       } catch {
         setCurrentUser(null);
@@ -190,6 +195,11 @@ export default function App() {
       studio: prefs.studio || "",
       studioManager: prefs.studioManager || "",
       bio: prefs.bio || "",
+      instagram: prefs.instagram || "",
+      tiktok: prefs.tiktok || "",
+      youtube: prefs.youtube || "",
+      twitter: prefs.twitter || "",
+      website: prefs.website || "",
     });
   };
 

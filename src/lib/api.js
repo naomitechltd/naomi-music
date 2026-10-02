@@ -56,6 +56,16 @@ export const deleteComment = (commentId) => call("delete-comment", { commentId }
 
 export const getArtistProfile = (userId) => call("get-artist-profile", { userId });
 
+export const followUser = (targetUserId) => call("follow", { targetUserId });
+export const unfollowUser = (targetUserId) => call("unfollow", { targetUserId });
+export const getFollowStats = (targetUserId) => call("follow-stats", { targetUserId });
+export const listFollowers = (targetUserId) => call("list-followers", { targetUserId });
+export const listFollowing = (targetUserId) => call("list-following", { targetUserId });
+export const incrementPlay = (songId) => call("increment-play", { songId });
+export const changeEmail = (email, password) => call("change-email", { email, password });
+export const deleteMyAccount = () => call("delete-my-account");
+export const exportMyData = () => call("export-my-data");
+
 export const resendVerification = async () => {
   const { account } = await import("./appwrite");
   return account.createVerification(`${window.location.origin}/`);
