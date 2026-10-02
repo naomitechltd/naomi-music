@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Search, LayoutGrid, List, Menu as ListIcon, ChevronLeft, X } from "lucide-react";
 import { tablesDB, DATABASE_ID, SONGS_TABLE_ID, Query, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "../components/ui";
+import { getRecentlyPlayed } from "../lib/recent";
 
 const VIEW_KEY = "naomi_browse_view";
 
@@ -36,8 +37,11 @@ export function BrowseView({ currentUser, onPlaySong }) {
   const [activeGenre, setActiveGenre] = useState(null);
   const [activeMood, setActiveMood] = useState(null);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [recent, setRecent] = useState([]);
 
   useEffect(() => { localStorage.setItem(VIEW_KEY, view); }, [view]);
+
+  useEffect(() => { setRecent(getRecentlyPlayed()); }, []);
 
   // Load songs
   useEffect(() => {
@@ -143,6 +147,41 @@ export function BrowseView({ currentUser, onPlaySong }) {
           <ViewBtn icon={ListIcon} active={view === "compact"} onClick={() => setView("compact")} title="Compact" />
         </div>
       </div>
+
+      {recent.length > 0 && (
+        <Section title="Recently played">
+          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6 }}>
+            {recent.map((r) => (
+              <button
+                key={r.$id}
+                onClick={() => {
+                  if (r.contentType === "poem") return;
+                  onPlaySong(recent, recent.findIndex((x) => x.$id === r.$id));
+                }}
+                style={{
+                  flexShrink: 0,
+                  width: 120,
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  color: "inherit",
+                  fontFamily: "inherit",
+                }}
+              >
+                <img
+                  src={fileUrl(r.coverArtField)}
+                  alt={r.title}
+                  style={{ width: 120, height: 120, borderRadius: 8, objectFit: "cover", background: theme.bgRaised, border: `1px solid ${theme.border}` }}
+                />
+                <div style={{ fontSize: 12.5, fontWeight: 600, marginTop: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</div>
+                <div style={{ fontSize: 11, opacity: 0.55, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.artistName}</div>
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Type chips */}
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>

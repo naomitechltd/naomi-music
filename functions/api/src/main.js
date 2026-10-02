@@ -1105,6 +1105,54 @@ async function sendPushToUser(db, userId, payload) {
 }
 
 
+
+async function getTrending(db, users, body) {
+  try {
+    const period = body.period || "all";
+
+    // Top songs by plays
+    const songsRes = await db.listRows(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, [
+      Query.equal("status", ["approved"]),
+      Query.orderDesc("playCount"),
+      Query.limit(50),
+    ]);
+    const songs = (songsRes.rows || []).slice(0, 20);
+
+    // Top artists by followers
+    const followsRes = await db.listRows(process.env.DATABASE_ID, process.env.FOLLOWS_TABLE_ID, [
+      Query.limit(2000),
+    ]).catch(() => ({ rows: [] }));
+
+    const followCounts = {};
+    for (const f of followsRes.rows) {
+      followCounts[f.followedUserId] = (followCounts[f.followedUserId] || 0) + 1;
+    }
+
+    const rankedArtists = Object.entries(followCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    const artists = [];
+    for (const [artistId, count] of rankedArtists) {
+      try {
+        const u = await users.get(artistId);
+        const prefs = await users.getPrefs(artistId).catch(() => ({}));
+        artists.push({
+          userId: u.$id,
+          name: u.name || u.email,
+          avatarFileId: prefs?.avatarFileId || "",
+          followers: count,
+        });
+      } catch {}
+    }
+
+    return { ok: true, songs, artists };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -1173,6 +1221,7 @@ export default async ({ req, res, log, error }) => {
     if (action === "clear-notice") { const out = await clearNotice(db, teams, userId); return res.json(out, out.code || 200); }
     if (action === "list-people") { const out = await listPeople(users, userId); return res.json(out, 200); }
     if (action === "save-push-sub") { const out = await savePushSub(db, userId, body); return res.json(out, out.code || 200); }
+    if (action === "get-trending") { const out = await getTrending(db, users, body); return res.json(out, 200); }
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }

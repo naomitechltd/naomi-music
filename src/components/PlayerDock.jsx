@@ -65,6 +65,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
     audioRef.current.play().then(() => setPlaying(true)).catch(() => {});
     // Count the play (server rate-limits to 1 per 30s per user per song)
     incrementPlay(song.$id).catch(() => {});
+    addRecentlyPlayed(song);
     setShowAddMenu(false);
     setAddedMsg("");
     setShowMenu(false);
