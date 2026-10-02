@@ -4,6 +4,7 @@
   "type": "module",
   "main": "src/main.js",
   "dependencies": {
-    "node-appwrite": "^27.1.0"
+    "node-appwrite": "^27.1.0",
+    "web-push": "^3.6.7"
   }
 }

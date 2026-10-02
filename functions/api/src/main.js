@@ -1,4 +1,5 @@
 import { Client, Teams, TablesDB, Users, Storage, Query } from "node-appwrite";
+import webpush from "web-push";
 
 function appwriteClient() {
   return new Client()
@@ -6,6 +7,16 @@ function appwriteClient() {
     .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
     .setKey(process.env.APPWRITE_API_KEY);
 }
+
+try {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || "mailto:admin@naomimusicrsa.co.za",
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+  }
+} catch (e) { console.error("VAPID setup failed:", e.message); }
 
 async function getRole(teams, userId) {
   const admins = await teams.listMemberships(process.env.ADMINS_TEAM_ID);
@@ -225,6 +236,21 @@ async function sendMessage(db, userId, body) {
     unreadA,
     unreadB,
   });
+
+  // Fire push notification (fire-and-forget)
+  try {
+    const otherUserId = conv.participants.find((p) => p !== userId);
+    if (otherUserId) {
+      const sender = await users.get(userId).catch(() => null);
+      const senderName = sender?.name || sender?.email || "New message";
+      await sendPushToUser(db, otherUserId, {
+        title: senderName,
+        body: text ? text.slice(0, 120) : "Sent an attachment",
+        url: "/messages",
+        tag: "msg-" + conversationId,
+      });
+    }
+  } catch (e) { /* push is optional */ }
 
   return { ok: true, id: row.$id };
 }
@@ -999,6 +1025,86 @@ async function clearNotice(db, teams, userId) {
 }
 
 
+
+async function listPeople(users, userId) {
+  try {
+    const adminTeams = new Teams(appwriteClient());
+    const [usersRes, admins, artists, poets] = await Promise.all([
+      users.list([Query.limit(200)]),
+      adminTeams.listMemberships(process.env.ADMINS_TEAM_ID).catch(() => ({ memberships: [] })),
+      adminTeams.listMemberships(process.env.ARTISTS_TEAM_ID).catch(() => ({ memberships: [] })),
+      process.env.POETS_TEAM_ID
+        ? adminTeams.listMemberships(process.env.POETS_TEAM_ID).catch(() => ({ memberships: [] }))
+        : Promise.resolve({ memberships: [] }),
+    ]);
+
+    const adminIds = new Set(admins.memberships.map((m) => m.userId));
+    const artistIds = new Set(artists.memberships.map((m) => m.userId));
+    const poetIds = new Set(poets.memberships.map((m) => m.userId));
+
+    const out = [];
+    for (const u of usersRes.users || []) {
+      if (u.$id === userId) continue;
+      const prefs = await users.getPrefs(u.$id).catch(() => ({}));
+      let role = "listener";
+      if (adminIds.has(u.$id)) role = "admin";
+      else if (artistIds.has(u.$id)) role = "artist";
+      else if (poetIds.has(u.$id)) role = "poet";
+      out.push({
+        userId: u.$id,
+        name: u.name || u.email,
+        email: u.email,
+        role,
+        avatarFileId: prefs?.avatarFileId || "",
+      });
+    }
+    return { ok: true, people: out };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+
+
+async function savePushSub(db, userId, body) {
+  const { endpoint, p256dh, auth } = body;
+  if (!endpoint || !p256dh || !auth) return { error: "missing subscription fields", code: 400 };
+
+  const existing = await db.listRows(process.env.DATABASE_ID, "push_subs", [
+    Query.equal("endpoint", [endpoint]),
+    Query.limit(10),
+  ]).catch(() => ({ rows: [] }));
+  for (const r of existing.rows) {
+    await db.deleteRow(process.env.DATABASE_ID, "push_subs", r.$id).catch(() => {});
+  }
+
+  await db.createRow(process.env.DATABASE_ID, "push_subs", "unique()", {
+    userId, endpoint, p256dh, auth,
+  });
+  return { ok: true };
+}
+
+async function sendPushToUser(db, userId, payload) {
+  const subs = await db.listRows(process.env.DATABASE_ID, "push_subs", [
+    Query.equal("userId", [userId]),
+    Query.limit(20),
+  ]).catch(() => ({ rows: [] }));
+
+  for (const sub of subs.rows) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        JSON.stringify(payload)
+      );
+    } catch (e) {
+      if (e.statusCode === 404 || e.statusCode === 410) {
+        await db.deleteRow(process.env.DATABASE_ID, "push_subs", sub.$id).catch(() => {});
+      }
+    }
+  }
+}
+
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -1065,6 +1171,8 @@ export default async ({ req, res, log, error }) => {
     if (action === "get-notice") { const out = await getActiveNotice(db); return res.json(out, 200); }
     if (action === "publish-notice") { const out = await publishNotice(db, teams, users, userId, body); return res.json(out, out.code || 200); }
     if (action === "clear-notice") { const out = await clearNotice(db, teams, userId); return res.json(out, out.code || 200); }
+    if (action === "list-people") { const out = await listPeople(users, userId); return res.json(out, 200); }
+    if (action === "save-push-sub") { const out = await savePushSub(db, userId, body); return res.json(out, out.code || 200); }
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }

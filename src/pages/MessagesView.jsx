@@ -1,22 +1,16 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { ChevronRight, Plus, Search, X } from "lucide-react";
-import { listConversations, openConversation } from "../lib/api";
+import { listConversations, openConversation, listPeople } from "../lib/api";
 import { functions, client, DATABASE_ID, CONVERSATIONS_TABLE_ID, MESSAGES_TABLE_ID } from "../lib/appwrite";
 import { theme, inputStyle } from "../components/ui";
 
 async function listArtists() {
-  const res = await functions.createExecution(
-    "api",
-    JSON.stringify({ action: "list-artists" }),
-    false
-  );
-  const raw =
-    res?.responseBody ??
-    res?.response ??
-    res?.data?.responseBody ??
-    res?.data?.response ??
-    "{}";
-  try { return JSON.parse(raw); } catch { return { ok: false }; }
+  try {
+    const res = await listPeople();
+    return { ok: true, artists: res.people || [] };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
 export function MessagesView({ currentUser, onOpenChat }) {
@@ -263,7 +257,7 @@ function AddPersonModal({ onClose, onPicked }) {
                     {p.name}
                   </div>
                   <div style={{ fontSize: 11, opacity: 0.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {p.role === "admin" ? "Admin" : "Artist"}
+                    {p.role === "admin" ? "Admin" : p.role === "artist" ? "Artist" : p.role === "poet" ? "Poet" : "Listener"}
                   </div>
                 </div>
               </button>

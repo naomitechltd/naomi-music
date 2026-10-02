@@ -66,6 +66,8 @@ export const changeEmail = (email, password) => call("change-email", { email, pa
 export const deleteMyAccount = () => call("delete-my-account");
 export const exportMyData = () => call("export-my-data");
 
+export const listPeople = () => call("list-people");
+export const savePushSub = (endpoint, p256dh, auth) => call("save-push-sub", { endpoint, p256dh, auth });
 export const getNotice = () => call("get-notice");
 export const publishNotice = (message, type) => call("publish-notice", { message, type });
 export const clearNotice = () => call("clear-notice");

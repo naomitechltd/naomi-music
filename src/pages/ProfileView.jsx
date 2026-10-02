@@ -6,6 +6,7 @@ import {
   Query, ID, BUCKET_ID, Permission, Role, fileUrl,
 } from "../lib/appwrite";
 import { theme, inputStyle, Button, Field, ErrorNote, getThemeMode, setThemeMode } from "../components/ui";
+import { enablePush, disablePush, isPushEnabled, isPushSupported } from "../lib/push";
 
 export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
   const [stats, setStats] = useState({ likes: 0, playlists: 0, uploads: 0, pending: 0, approved: 0 });
@@ -275,6 +276,15 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
         </Button>
       </div>
 
+      {/* Notifications */}
+      <div style={{ marginTop: 28, background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 12, padding: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 600 }}>Notifications</div>
+        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2, marginBottom: 14 }}>
+          Get notified when someone messages you.
+        </div>
+        <PushToggle />
+      </div>
+
       {/* Theme */}
       <div style={{ marginTop: 28, background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 12, padding: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>Appearance</div>
@@ -374,6 +384,70 @@ function ThemeToggle() {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function PushToggle() {
+  const [enabled, setEnabled] = React.useState(false);
+  const [supported, setSupported] = React.useState(true);
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState("");
+
+  React.useEffect(() => {
+    (async () => {
+      const s = await isPushSupported();
+      setSupported(s);
+      if (s) setEnabled(await isPushEnabled());
+    })();
+  }, []);
+
+  const toggle = async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      if (enabled) {
+        await disablePush();
+        setEnabled(false);
+        setMsg("Notifications off");
+      } else {
+        await enablePush();
+        setEnabled(true);
+        setMsg("Notifications on");
+      }
+      setTimeout(() => setMsg(""), 2500);
+    } catch (e) {
+      setMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!supported) {
+    return <div style={{ fontSize: 12.5, opacity: 0.55 }}>Your browser doesn't support push notifications.</div>;
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <button
+        onClick={toggle}
+        disabled={busy}
+        style={{
+          background: enabled ? theme.accent : theme.bg,
+          color: enabled ? "#fff" : theme.text,
+          border: `1px solid ${enabled ? theme.accent : theme.border}`,
+          borderRadius: 8,
+          padding: "10px 18px",
+          cursor: busy ? "wait" : "pointer",
+          fontFamily: "inherit",
+          fontSize: 13,
+          fontWeight: 600,
+          opacity: busy ? 0.6 : 1,
+        }}
+      >
+        {busy ? "..." : enabled ? "Turn off" : "Enable notifications"}
+      </button>
+      {msg && <span style={{ fontSize: 12, opacity: 0.7 }}>{msg}</span>}
     </div>
   );
 }
