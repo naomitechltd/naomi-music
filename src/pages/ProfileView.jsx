@@ -21,6 +21,7 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
   const [location, setLocation] = useState(currentUser.location || "");
   const [studio, setStudio] = useState(currentUser.studio || "");
   const [studioManager, setStudioManager] = useState(currentUser.studioManager || "");
+  const [bio, setBio] = useState(currentUser.bio || "");
   const [contactBusy, setContactBusy] = useState(false);
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
@@ -66,8 +67,8 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
     setContactBusy(true);
     setError("");
     try {
-      await account.updatePrefs({ phone, location, studio, studioManager });
-      setCurrentUser((u) => ({ ...u, phone, location, studio, studioManager }));
+      await account.updatePrefs({ phone, location, studio, studioManager, bio });
+      setCurrentUser((u) => ({ ...u, phone, location, studio, studioManager, bio }));
       flash("Profile updated");
     } catch (e) {
       setError(e.message);
@@ -236,6 +237,17 @@ export function ProfileView({ currentUser, setCurrentUser, onLogout }) {
             </Field>
           </>
         )}
+
+        <Field label="Bio (max 300 chars)">
+          <textarea
+            rows={3}
+            maxLength={300}
+            style={{ ...inputStyle(), resize: "vertical" }}
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder="Tell listeners about yourself…"
+          />
+        </Field>
 
         <Button onClick={saveContact} disabled={contactBusy}>
           {contactBusy ? "Saving..." : "Save"}

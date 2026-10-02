@@ -125,6 +125,7 @@ export default function App() {
           location: prefs.location || "",
           studio: prefs.studio || "",
           studioManager: prefs.studioManager || "",
+          bio: prefs.bio || "",
         });
       } catch {
         setCurrentUser(null);
@@ -188,6 +189,7 @@ export default function App() {
       location: prefs.location || "",
       studio: prefs.studio || "",
       studioManager: prefs.studioManager || "",
+      bio: prefs.bio || "",
     });
   };
 
@@ -235,7 +237,7 @@ export default function App() {
         <Route path="/profile" element={requireAuth(<ProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} onLogout={handleLogout} />)} />
         <Route path="/radio" element={requireAuth(<RadioView />)} />
         <Route path="/song/:id" element={<SongPage currentUser={currentUser} onPlaySong={playSong} onPlay={playSong} />} />
-        <Route path="/artist/:id" element={<ArtistPage currentUser={currentUser} onPlaySong={playSong} />} />
+        <Route path="/artist/:id" element={<ArtistPage currentUser={currentUser} onPlaySong={playSong} onOpenChat={openChatFromAnywhere} />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />

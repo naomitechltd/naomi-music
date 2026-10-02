@@ -54,6 +54,8 @@ export const submitComment = (songId, body) => call("submit-comment", { songId, 
 export const listComments = (songId, limit) => call("list-comments", { songId, limit });
 export const deleteComment = (commentId) => call("delete-comment", { commentId });
 
+export const getArtistProfile = (userId) => call("get-artist-profile", { userId });
+
 export const resendVerification = async () => {
   const { account } = await import("./appwrite");
   return account.createVerification(`${window.location.origin}/`);

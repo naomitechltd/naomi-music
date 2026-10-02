@@ -601,6 +601,41 @@ async function deleteComment(db, teams, userId, body) {
 }
 
 
+
+async function getArtistProfile(db, users, body) {
+  const { userId } = body;
+  if (!userId) return { error: "missing userId", code: 400 };
+
+  const user = await users.get(userId).catch(() => null);
+  if (!user) return { error: "user not found", code: 404 };
+
+  const prefs = await users.getPrefs(userId).catch(() => ({}));
+
+  const songsRes = await db.listRows(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, [
+    Query.equal("uploadedByUserId", [userId]),
+    Query.equal("status", ["approved"]),
+    Query.orderDesc("$createdAt"),
+    Query.limit(200),
+  ]);
+
+  return {
+    ok: true,
+    profile: {
+      userId: user.$id,
+      name: user.name || user.email || "Artist",
+      location: prefs?.location || "",
+      studio: prefs?.studio || "",
+      studioManager: prefs?.studioManager || "",
+      bio: prefs?.bio || "",
+      avatarFileId: prefs?.avatarFileId || "",
+      joinedAt: user.$createdAt,
+      verified: !!user.emailVerification,
+    },
+    songs: songsRes.rows || [],
+  };
+}
+
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -653,6 +688,7 @@ export default async ({ req, res, log, error }) => {
     if (action === "submit-comment") { const out = await submitComment(db, users, userId, body); return res.json(out, out.code || 200); }
     if (action === "list-comments") { const out = await listComments(db, body); return res.json(out, out.code || 200); }
     if (action === "delete-comment") { const out = await deleteComment(db, teams, userId, body); return res.json(out, out.code || 200); }
+    if (action === "get-artist-profile") { const out = await getArtistProfile(db, users, body); return res.json(out, out.code || 200); }
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }
