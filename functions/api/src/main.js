@@ -931,6 +931,74 @@ async function exportMyData(db, users, userId) {
 }
 
 
+
+async function getActiveNotice(db) {
+  try {
+    const res = await db.listRows(process.env.DATABASE_ID, process.env.NOTICES_TABLE_ID, [
+      Query.equal("active", [1]),
+      Query.orderDesc("$createdAt"),
+      Query.limit(1),
+    ]);
+    const row = res.rows?.[0];
+    if (!row) return { ok: true, notice: null };
+    return {
+      ok: true,
+      notice: {
+        $id: row.$id,
+        message: row.message,
+        type: row.type || "info",
+        createdByName: row.createdByName || "Admin",
+        $createdAt: row.$createdAt,
+      },
+    };
+  } catch {
+    return { ok: true, notice: null };
+  }
+}
+
+async function publishNotice(db, teams, users, userId, body) {
+  const role = await getRole(teams, userId);
+  if (role !== "admin") return { error: "forbidden", code: 403 };
+
+  const { message, type = "info" } = body;
+  if (!message) return { error: "missing message", code: 400 };
+  if (message.length > 500) return { error: "message too long (max 500)", code: 400 };
+  if (!["info", "warning", "urgent"].includes(type)) return { error: "bad type", code: 400 };
+
+  // Deactivate all existing notices
+  const existing = await db.listRows(process.env.DATABASE_ID, process.env.NOTICES_TABLE_ID, [
+    Query.equal("active", [1]),
+    Query.limit(100),
+  ]).catch(() => ({ rows: [] }));
+  for (const r of existing.rows) {
+    await db.updateRow(process.env.DATABASE_ID, process.env.NOTICES_TABLE_ID, r.$id, { active: 0 }).catch(() => {});
+  }
+
+  const me = await users.get(userId);
+  const row = await db.createRow(process.env.DATABASE_ID, process.env.NOTICES_TABLE_ID, "unique()", {
+    message,
+    type,
+    createdByUserId: userId,
+    createdByName: me.name || me.email || "Admin",
+    active: 1,
+  });
+  return { ok: true, notice: { $id: row.$id, message, type, createdByName: me.name || "Admin" } };
+}
+
+async function clearNotice(db, teams, userId) {
+  const role = await getRole(teams, userId);
+  if (role !== "admin") return { error: "forbidden", code: 403 };
+  const existing = await db.listRows(process.env.DATABASE_ID, process.env.NOTICES_TABLE_ID, [
+    Query.equal("active", [1]),
+    Query.limit(100),
+  ]).catch(() => ({ rows: [] }));
+  for (const r of existing.rows) {
+    await db.updateRow(process.env.DATABASE_ID, process.env.NOTICES_TABLE_ID, r.$id, { active: 0 }).catch(() => {});
+  }
+  return { ok: true };
+}
+
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -994,6 +1062,9 @@ export default async ({ req, res, log, error }) => {
     if (action === "change-email") { const out = await changeEmail(users, userId, body); return res.json(out, out.code || 200); }
     if (action === "delete-my-account") { const out = await deleteMyAccount(db, users, storage, userId); return res.json(out, out.code || 200); }
     if (action === "export-my-data") { const out = await exportMyData(db, users, userId); return res.json(out, out.code || 200); }
+    if (action === "get-notice") { const out = await getActiveNotice(db); return res.json(out, 200); }
+    if (action === "publish-notice") { const out = await publishNotice(db, teams, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "clear-notice") { const out = await clearNotice(db, teams, userId); return res.json(out, out.code || 200); }
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }

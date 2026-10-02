@@ -66,6 +66,10 @@ export const changeEmail = (email, password) => call("change-email", { email, pa
 export const deleteMyAccount = () => call("delete-my-account");
 export const exportMyData = () => call("export-my-data");
 
+export const getNotice = () => call("get-notice");
+export const publishNotice = (message, type) => call("publish-notice", { message, type });
+export const clearNotice = () => call("clear-notice");
+
 export const resendVerification = async () => {
   const { account } = await import("./appwrite");
   return account.createVerification(`${window.location.origin}/`);

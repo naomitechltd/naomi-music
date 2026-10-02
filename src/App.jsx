@@ -15,12 +15,14 @@ import { ChatView } from "./pages/ChatView";
 import { SongPage } from "./pages/SongPage";
 import { RadioView } from "./pages/RadioView";
 import { AdminReportsView } from "./pages/AdminReportsView";
+import { AdminNoticeView } from "./pages/AdminNoticeView";
 import { ArtistPage } from "./pages/ArtistPage";
 import { AboutPage, TermsPage, PrivacyPage, TsCsPage, DeveloperPage } from "./pages/StaticPages";
 import { PlayerDock } from "./components/PlayerDock";
 import { NavBar } from "./components/NavBar";
 import { EmailVerifyBanner } from "./components/EmailVerifyBanner";
 import { CompleteProfileBanner } from "./components/CompleteProfileBanner";
+import { NoticeBanner } from "./components/NoticeBanner";
 import { SplashScreen } from "./components/SplashScreen";
 import { theme } from "./components/ui";
 
@@ -231,6 +233,7 @@ export default function App() {
       )}
       {currentUser && <EmailVerifyBanner currentUser={currentUser} />}
       {currentUser && <CompleteProfileBanner currentUser={currentUser} />}
+      {currentUser && <NoticeBanner currentUser={currentUser} />}
 
       <Routes>
         <Route path="/" element={requireAuth(<BrowseView currentUser={currentUser} onPlaySong={playSong} />)} />
@@ -239,6 +242,7 @@ export default function App() {
         <Route path="/mysongs" element={requireAuth(isArtist ? <MySongsView currentUser={currentUser} refreshKey={refreshKey} /> : <Navigate to="/" />)} />
         <Route path="/admin" element={requireAuth(isAdmin ? <AdminQueueView /> : <Navigate to="/" />)} />
         <Route path="/admin/reports" element={requireAuth(isAdmin ? <AdminReportsView /> : <Navigate to="/" />)} />
+        <Route path="/admin/notices" element={requireAuth(isAdmin ? <AdminNoticeView /> : <Navigate to="/" />)} />
         <Route path="/messages" element={requireAuth(
           openConversation
             ? <ChatView conversation={openConversation} currentUser={currentUser} onBack={() => setOpenConversation(null)} />
