@@ -17,6 +17,7 @@ import { RadioView } from "./pages/RadioView";
 import { AdminReportsView } from "./pages/AdminReportsView";
 import { AdminNoticeView } from "./pages/AdminNoticeView";
 import { TrendingView } from "./pages/TrendingView";
+import { ArtistsDirectoryView } from "./pages/ArtistsDirectoryView";
 import { ArtistPage } from "./pages/ArtistPage";
 import { AboutPage, TermsPage, PrivacyPage, TsCsPage, DeveloperPage } from "./pages/StaticPages";
 import { PlayerDock } from "./components/PlayerDock";
@@ -252,6 +253,7 @@ export default function App() {
         <Route path="/profile" element={requireAuth(<ProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} onLogout={handleLogout} />)} />
         <Route path="/radio" element={requireAuth(<RadioView />)} />
         <Route path="/trending" element={requireAuth(<TrendingView onPlaySong={playSong} />)} />
+        <Route path="/artists" element={requireAuth(<ArtistsDirectoryView />)} />
         <Route path="/song/:id" element={<SongPage currentUser={currentUser} onPlaySong={playSong} onPlay={playSong} />} />
         <Route path="/artist/:id" element={<ArtistPage currentUser={currentUser} onPlaySong={playSong} onOpenChat={openChatFromAnywhere} />} />
         <Route path="/about" element={<AboutPage />} />

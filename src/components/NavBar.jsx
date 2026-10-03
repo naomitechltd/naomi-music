@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu, X, MessageSquare, Radio, TrendingUp } from "lucide-react";
+import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu, X, MessageSquare, Radio, TrendingUp, Mic2 } from "lucide-react";
 import { theme } from "./ui";
 import { fileUrl } from "../lib/appwrite";
 
@@ -49,6 +49,7 @@ export function NavBar({ isArtist, isAdmin, currentUser, onLogout, onStartRadio 
     { path: "/playlists", label: "Playlists", icon: Library },
     { path: "/messages", label: "Messages", icon: MessageSquare },
     { path: "/trending", label: "Trending", icon: TrendingUp },
+    { path: "/artists", label: "Artists", icon: Mic2 },
     ...(isArtist ? [{ path: "/upload", label: "Upload", icon: UploadCloud }] : []),
     ...(isArtist ? [{ path: "/mysongs", label: "My Songs", icon: ListMusic }] : []),
     ...(isAdmin ? [{ path: "/admin", label: "Admin", icon: ShieldCheck }] : []),

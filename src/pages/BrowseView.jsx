@@ -24,7 +24,7 @@ const GENRE_STYLES = {
 const MOOD_CARDS = [
   { label: "Fresh drops",    key: "fresh",     bg: "linear-gradient(135deg, #7c5cff 0%, #3a1c71 100%)", emoji: "🌟" },
   { label: "Most liked",     key: "liked",     bg: "linear-gradient(135deg, #ff4d6d 0%, #8a1030 100%)", emoji: "❤️" },
-  { label: "Radio mix",      key: "radio",     bg: "linear-gradient(135deg, #ff8008 0%, #ffc837 100%)", emoji: "📻" },
+  { label: "Trending",       key: "trending",  bg: "linear-gradient(135deg, #ff8008 0%, #ffc837 100%)", emoji: "🔥" },
 ];
 
 export function BrowseView({ currentUser, onPlaySong }) {
@@ -100,13 +100,8 @@ export function BrowseView({ currentUser, onPlaySong }) {
       list = [...list].sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt));
     } else if (activeMood === "liked") {
       list = [...list].sort((a, b) => (likes[b.$id] || 0) - (likes[a.$id] || 0));
-    } else if (activeMood === "radio") {
-      // shuffle
-      list = [...list];
-      for (let i = list.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [list[i], list[j]] = [list[j], list[i]];
-      }
+    } else if (activeMood === "trending") {
+      list = [...list].sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
     }
 
     // Search

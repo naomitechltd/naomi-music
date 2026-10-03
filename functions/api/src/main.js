@@ -1153,6 +1153,100 @@ async function getTrending(db, users, body) {
 }
 
 
+
+async function listArtistsDirectory(users) {
+  try {
+    const teams = new Teams(appwriteClient());
+    const [usersRes, artists, poets] = await Promise.all([
+      users.list([Query.limit(200)]),
+      teams.listMemberships(process.env.ARTISTS_TEAM_ID).catch(() => ({ memberships: [] })),
+      process.env.POETS_TEAM_ID
+        ? teams.listMemberships(process.env.POETS_TEAM_ID).catch(() => ({ memberships: [] }))
+        : Promise.resolve({ memberships: [] }),
+    ]);
+
+    const artistIds = new Set(artists.memberships.map((m) => m.userId));
+    const poetIds = new Set(poets.memberships.map((m) => m.userId));
+
+    const out = [];
+    for (const u of usersRes.users || []) {
+      const isArtist = artistIds.has(u.$id);
+      const isPoet = poetIds.has(u.$id);
+      if (!isArtist && !isPoet) continue;
+      const prefs = await users.getPrefs(u.$id).catch(() => ({}));
+      out.push({
+        userId: u.$id,
+        name: u.name || u.email,
+        location: prefs?.location || "",
+        studio: prefs?.studio || "",
+        bio: prefs?.bio || "",
+        avatarFileId: prefs?.avatarFileId || "",
+        role: isArtist ? "artist" : "poet",
+      });
+    }
+    // Sort: artists first, then alphabetical
+    out.sort((a, b) => {
+      if (a.role !== b.role) return a.role === "artist" ? -1 : 1;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+    return { ok: true, artists: out };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function listTimeline(db, body) {
+  const { userId } = body;
+  if (!userId) return { error: "missing userId", code: 400 };
+  const res = await db.listRows(process.env.DATABASE_ID, process.env.TIMELINE_TABLE_ID, [
+    Query.equal("userId", [userId]),
+    Query.orderDesc("year"),
+    Query.limit(100),
+  ]).catch(() => ({ rows: [] }));
+  return { ok: true, entries: res.rows || [] };
+}
+
+async function addTimelineEntry(db, users, userId, body) {
+  const { year, content } = body;
+  if (!year || !content) return { error: "year and content required", code: 400 };
+  const trimmedYear = String(year).trim().slice(0, 20);
+  const trimmedContent = String(content).trim();
+  if (!trimmedYear) return { error: "year required", code: 400 };
+  if (!trimmedContent) return { error: "content required", code: 400 };
+  if (trimmedContent.length > 2000) return { error: "entry too long (max 2000)", code: 400 };
+
+  const me = await users.get(userId);
+  if (!me.emailVerification) return { error: "email-not-verified", code: 403 };
+
+  // Extract mentioned userIds from the content format: @[Name](userId)
+  const mentionedIds = [];
+  const re = /@\[[^\]]+\]\(([a-zA-Z0-9]+)\)/g;
+  let m;
+  while ((m = re.exec(trimmedContent)) !== null) {
+    if (!mentionedIds.includes(m[1])) mentionedIds.push(m[1]);
+  }
+
+  const row = await db.createRow(process.env.DATABASE_ID, process.env.TIMELINE_TABLE_ID, "unique()", {
+    userId,
+    year: trimmedYear,
+    content: trimmedContent,
+    mentions: mentionedIds.join(","),
+  });
+  return { ok: true, id: row.$id };
+}
+
+async function deleteTimelineEntry(db, teams, userId, body) {
+  const { entryId } = body;
+  if (!entryId) return { error: "missing entryId", code: 400 };
+  const row = await db.getRow(process.env.DATABASE_ID, process.env.TIMELINE_TABLE_ID, entryId);
+  const role = await getRole(teams, userId);
+  const isAdmin = role === "admin";
+  if (row.userId !== userId && !isAdmin) return { error: "forbidden", code: 403 };
+  await db.deleteRow(process.env.DATABASE_ID, process.env.TIMELINE_TABLE_ID, entryId);
+  return { ok: true };
+}
+
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -1222,6 +1316,10 @@ export default async ({ req, res, log, error }) => {
     if (action === "list-people") { const out = await listPeople(users, userId); return res.json(out, 200); }
     if (action === "save-push-sub") { const out = await savePushSub(db, userId, body); return res.json(out, out.code || 200); }
     if (action === "get-trending") { const out = await getTrending(db, users, body); return res.json(out, 200); }
+    if (action === "list-artists-directory") { const out = await listArtistsDirectory(users); return res.json(out, 200); }
+    if (action === "list-timeline") { const out = await listTimeline(db, body); return res.json(out, out.code || 200); }
+    if (action === "add-timeline-entry") { const out = await addTimelineEntry(db, users, userId, body); return res.json(out, out.code || 200); }
+    if (action === "delete-timeline-entry") { const out = await deleteTimelineEntry(db, teams, userId, body); return res.json(out, out.code || 200); }
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }

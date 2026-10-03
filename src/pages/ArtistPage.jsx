@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, Query, fileUrl } from "../lib/appwrite";
 import { getArtistProfile, openConversation, followUser, unfollowUser, getFollowStats } from "../lib/api";
+import { Timeline } from "../components/Timeline";
 import { theme } from "../components/ui";
 
 const VIEW_KEY = "naomi_artist_view";
@@ -203,6 +204,9 @@ export function ArtistPage({ currentUser, onPlaySong, onOpenChat }) {
           )}
         </div>
       </div>
+
+      {/* Timeline */}
+      <Timeline userId={id} isOwnProfile={isOwnProfile} currentUser={currentUser} />
 
       {/* Discography */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 32, marginBottom: 16 }}>
