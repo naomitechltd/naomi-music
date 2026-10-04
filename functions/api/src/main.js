@@ -1247,6 +1247,130 @@ async function deleteTimelineEntry(db, teams, userId, body) {
 }
 
 
+
+async function logEventsBatch(db, userId, body) {
+  const { events = [], sessionId = "" } = body;
+  if (!Array.isArray(events) || events.length === 0) return { ok: true, written: 0 };
+  const limited = events.slice(0, 50);
+
+  let written = 0;
+  for (const ev of limited) {
+    try {
+      await db.createRow(process.env.DATABASE_ID, process.env.EVENTS_TABLE_ID, "unique()", {
+        userId: userId || "",
+        eventType: String(ev.type || "").slice(0, 40),
+        page: String(ev.page || "").slice(0, 100),
+        songId: String(ev.songId || "").slice(0, 36),
+        sessionId: String(sessionId || ev.sessionId || "").slice(0, 36),
+        durationMs: Number(ev.durationMs) || 0,
+        value: Number(ev.value) || 0,
+        metadata: String(ev.metadata || "").slice(0, 500),
+      });
+      written++;
+    } catch (e) { /* skip bad event */ }
+  }
+  return { ok: true, written };
+}
+
+async function getAnalytics(db, teams, userId, body) {
+  const role = await getRole(teams, userId);
+  if (role !== "admin") return { error: "forbidden", code: 403 };
+
+  const now = Date.now();
+  const dayAgo = now - 24 * 60 * 60 * 1000;
+  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+  // Fetch recent events (last 7 days, capped)
+  const res = await db.listRows(process.env.DATABASE_ID, process.env.EVENTS_TABLE_ID, [
+    Query.orderDesc("$createdAt"),
+    Query.limit(2000),
+  ]).catch(() => ({ rows: [] }));
+  const events = res.rows || [];
+
+  const byType = {};
+  const byPage = {};
+  const bySong = {};
+  const byUser = {};
+  const bySession = {};
+  const recentErrors = [];
+  const recentSearches = [];
+  const last24h = [];
+
+  for (const e of events) {
+    const created = new Date(e.$createdAt).getTime();
+    byType[e.eventType] = (byType[e.eventType] || 0) + 1;
+    if (e.page) byPage[e.page] = (byPage[e.page] || 0) + 1;
+    if (e.songId) bySong[e.songId] = (bySong[e.songId] || 0) + 1;
+    if (e.userId) byUser[e.userId] = (byUser[e.userId] || 0) + 1;
+    if (e.sessionId) {
+      if (!bySession[e.sessionId]) bySession[e.sessionId] = { duration: 0, started: created };
+      bySession[e.sessionId].duration = Math.max(bySession[e.sessionId].duration, e.durationMs || 0);
+    }
+    if (e.eventType === "error" && recentErrors.length < 20) recentErrors.push(e);
+    if (e.eventType === "search" && recentSearches.length < 30) recentSearches.push(e);
+    if (created >= dayAgo) last24h.push(e);
+  }
+
+  // Currently active sessions (last 5 min)
+  const fiveMinAgo = now - 5 * 60 * 1000;
+  const activeSessions = Object.entries(bySession).filter(
+    ([_, s]) => now - s.started < 5 * 60 * 1000
+  ).length;
+
+  // Average session duration
+  const durations = Object.values(bySession).map((s) => s.duration).filter((d) => d > 0);
+  const avgDuration = durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+
+  // Top songs — resolve names
+  const topSongIds = Object.entries(bySong).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const topSongs = [];
+  for (const [songId, count] of topSongIds) {
+    try {
+      const song = await db.getRow(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, songId);
+      topSongs.push({ songId, title: song.title, artistName: song.artistName, count });
+    } catch {}
+  }
+
+  // Top pages
+  const topPages = Object.entries(byPage).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([path, count]) => ({ path, count }));
+
+  // Top event types
+  const topTypes = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([type, count]) => ({ type, count }));
+
+  // Events over last 24h by hour
+  const hourly = new Array(24).fill(0);
+  for (const e of last24h) {
+    const hoursAgo = Math.floor((now - new Date(e.$createdAt).getTime()) / (60 * 60 * 1000));
+    if (hoursAgo >= 0 && hoursAgo < 24) hourly[23 - hoursAgo]++;
+  }
+
+  return {
+    ok: true,
+    totals: {
+      allTime: events.length,
+      last24h: last24h.length,
+      activeSessions,
+      avgSessionDurationMs: avgDuration,
+    },
+    byType: topTypes,
+    topPages,
+    topSongs,
+    hourly,
+    recentErrors: recentErrors.map((e) => ({
+      $createdAt: e.$createdAt,
+      page: e.page,
+      metadata: e.metadata,
+      userId: e.userId,
+    })),
+    recentSearches: recentSearches.map((e) => ({
+      $createdAt: e.$createdAt,
+      metadata: e.metadata,
+      userId: e.userId,
+    })),
+  };
+}
+
+
 /* ---------- Router ---------- */
 
 export default async ({ req, res, log, error }) => {
@@ -1320,6 +1444,8 @@ export default async ({ req, res, log, error }) => {
     if (action === "list-timeline") { const out = await listTimeline(db, body); return res.json(out, out.code || 200); }
     if (action === "add-timeline-entry") { const out = await addTimelineEntry(db, users, userId, body); return res.json(out, out.code || 200); }
     if (action === "delete-timeline-entry") { const out = await deleteTimelineEntry(db, teams, userId, body); return res.json(out, out.code || 200); }
+    if (action === "log-events") { const out = await logEventsBatch(db, userId, body); return res.json(out, 200); }
+    if (action === "get-analytics") { const out = await getAnalytics(db, teams, userId, body); return res.json(out, out.code || 200); }
     if (action === "radio-now") { const out = await radioNow(db, body); return res.json(out, out.code || 200); }
     if (action === "list-artists") { const out = await listArtists(teams, users, userId); return res.json(out, 200); }
     if (action === "list-requests") { const out = await listRequests(db, userId); return res.json(out, 200); }

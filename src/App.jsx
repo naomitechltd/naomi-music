@@ -18,6 +18,7 @@ import { AdminReportsView } from "./pages/AdminReportsView";
 import { AdminNoticeView } from "./pages/AdminNoticeView";
 import { TrendingView } from "./pages/TrendingView";
 import { ArtistsDirectoryView } from "./pages/ArtistsDirectoryView";
+import { AdminAnalyticsView } from "./pages/AdminAnalyticsView";
 import { ArtistPage } from "./pages/ArtistPage";
 import { AboutPage, TermsPage, PrivacyPage, TsCsPage, DeveloperPage } from "./pages/StaticPages";
 import { PlayerDock } from "./components/PlayerDock";
@@ -213,6 +214,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    track("logout");
     await account.deleteSession("current");
     setOpenConversation(null);
     setCurrentUser(null);
@@ -245,6 +247,7 @@ export default function App() {
         <Route path="/admin" element={requireAuth(isAdmin ? <AdminQueueView /> : <Navigate to="/" />)} />
         <Route path="/admin/reports" element={requireAuth(isAdmin ? <AdminReportsView /> : <Navigate to="/" />)} />
         <Route path="/admin/notices" element={requireAuth(isAdmin ? <AdminNoticeView /> : <Navigate to="/" />)} />
+        <Route path="/admin/analytics" element={requireAuth(isAdmin ? <AdminAnalyticsView /> : <Navigate to="/" />)} />
         <Route path="/messages" element={requireAuth(
           openConversation
             ? <ChatView conversation={openConversation} currentUser={currentUser} onBack={() => setOpenConversation(null)} />

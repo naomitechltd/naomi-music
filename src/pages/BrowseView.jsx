@@ -4,6 +4,7 @@ import { Search, LayoutGrid, List, Menu as ListIcon, ChevronLeft, X } from "luci
 import { tablesDB, DATABASE_ID, SONGS_TABLE_ID, Query, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "../components/ui";
 import { getRecentlyPlayed } from "../lib/recent";
+import { track } from "../lib/tracker";
 
 const VIEW_KEY = "naomi_browse_view";
 
@@ -42,6 +43,15 @@ export function BrowseView({ currentUser, onPlaySong }) {
   useEffect(() => { localStorage.setItem(VIEW_KEY, view); }, [view]);
 
   useEffect(() => { setRecent(getRecentlyPlayed()); }, []);
+
+  // Log search terms after 1.2s of no typing
+  useEffect(() => {
+    if (!query.trim()) return;
+    const t = setTimeout(() => {
+      track("search", { metadata: query.trim().slice(0, 100) });
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [query]);
 
   // Load songs
   useEffect(() => {
