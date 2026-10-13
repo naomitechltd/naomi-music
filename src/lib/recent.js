@@ -13,11 +13,11 @@ export function getRecentlyPlayed() {
 }
 
 export function addRecentlyPlayed(song) {
+  if (!song) return;
   if (!song || !song.$id) return;
   try {
     const list = getRecentlyPlayed().filter((s) => s.$id !== song.$id);
     list.unshift({
-      if (!song) return;
       $id: song.$id,
       title: song.title,
       artistName: song.artistName,
