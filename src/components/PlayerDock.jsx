@@ -207,7 +207,7 @@ export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, curr
 
   return (
     <>
-      <audio ref={audioRef} src={fileUrl(song.audioField)} preload="metadata" />
+      <audio ref={audioRef} src={song ? fileUrl(song.audioField) : ""} preload="metadata" />
 
       {/* Mini bar */}
       {!expanded && (

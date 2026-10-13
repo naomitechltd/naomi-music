@@ -26,5 +26,6 @@ export const COMMENTS_TABLE_ID = import.meta.env.VITE_APPWRITE_COMMENTS_TABLE_ID
 export { ID, Query, Permission, Role };
 
 export function fileUrl(fileId) {
+  if (!fileId) return "";
   return `${import.meta.env.VITE_APPWRITE_ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${import.meta.env.VITE_APPWRITE_PROJECT_ID}`;
 }
