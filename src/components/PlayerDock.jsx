@@ -4,6 +4,7 @@ import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown
 import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID, PLAYLIST_SONGS_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
 import { theme, inputStyle } from "./ui";
 import { openConversation, incrementPlay } from "../lib/api";
+import { addRecentlyPlayed } from "../lib/recent";
 import { ReportModal } from "./ReportModal";
 
 function formatTime(sec) {
