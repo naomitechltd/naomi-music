@@ -1,0 +1,118 @@
+/* src/theme.css */
+
+/* ---------- DARK (default) ---------- */
+:root,
+:root[data-theme="dark"] {
+  --bg:            oklch(0.13 0.025 275);
+  --bg-raised:     oklch(0.18 0.03 275);
+  --bg-alt:        oklch(0.16 0.028 275);
+  --surface:       oklch(0.20 0.032 275);
+  --card:          oklch(0.18 0.03 275);
+  --card-hover:    oklch(0.22 0.035 275);
+  --overlay:       rgba(0, 0, 0, 0.55);
+
+  --text:          oklch(0.96 0.012 85);
+  --text-muted:    oklch(0.68 0.035 275);
+  --text-dim:      oklch(0.52 0.03 275);
+  --text-inverse:  oklch(0.13 0.025 275);
+
+  --border:        oklch(1 0 0 / 11%);
+  --border-strong: oklch(1 0 0 / 22%);
+  --divider:       oklch(1 0 0 / 8%);
+
+  --accent:        oklch(0.72 0.19 25);
+  --accent-2:      oklch(0.66 0.22 305);
+  --accent-hover:  oklch(0.78 0.19 25);
+  --accent-fg:     #ffffff;
+  --accent-grad:   linear-gradient(110deg, var(--accent), var(--accent-2));
+  --accent-soft:   color-mix(in oklab, var(--accent) 18%, transparent);
+
+  --success:       oklch(0.72 0.16 150);
+  --warning:       oklch(0.80 0.16 80);
+  --danger:        oklch(0.68 0.20 25);
+  --info:          oklch(0.72 0.14 220);
+
+  --shadow-sm:     0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md:     0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg:     0 24px 48px rgba(0, 0, 0, 0.5);
+  --shadow-glow:   0 8px 26px color-mix(in oklab, var(--accent) 40%, transparent);
+
+  color-scheme: dark;
+}
+
+/* ---------- LIGHT ---------- */
+:root[data-theme="light"] {
+  --bg:            oklch(0.97 0.012 85);
+  --bg-raised:     oklch(0.93 0.02 85);
+  --bg-alt:        oklch(0.95 0.015 85);
+  --surface:       oklch(0.99 0.006 85);
+  --card:          #ffffff;
+  --card-hover:    oklch(0.985 0.005 85);
+  --overlay:       rgba(30, 20, 60, 0.35);
+
+  --text:          oklch(0.18 0.03 275);
+  --text-muted:    oklch(0.48 0.04 275);
+  --text-dim:      oklch(0.60 0.03 275);
+  --text-inverse:  oklch(0.97 0.012 85);
+
+  --border:        oklch(0.18 0.03 275 / 12%);
+  --border-strong: oklch(0.18 0.03 275 / 24%);
+  --divider:       oklch(0.18 0.03 275 / 8%);
+
+  --accent:        oklch(0.60 0.19 25);
+  --accent-2:      oklch(0.55 0.22 305);
+  --accent-hover:  oklch(0.55 0.19 25);
+  --accent-fg:     #ffffff;
+  --accent-grad:   linear-gradient(110deg, var(--accent), var(--accent-2));
+  --accent-soft:   color-mix(in oklab, var(--accent) 14%, transparent);
+
+  --success:       oklch(0.55 0.15 150);
+  --warning:       oklch(0.68 0.15 80);
+  --danger:        oklch(0.55 0.19 25);
+  --info:          oklch(0.55 0.13 220);
+
+  --shadow-sm:     0 2px 6px rgba(30, 20, 60, 0.06);
+  --shadow-md:     0 8px 22px rgba(30, 20, 60, 0.10);
+  --shadow-lg:     0 24px 44px rgba(30, 20, 60, 0.16);
+  --shadow-glow:   0 8px 22px color-mix(in oklab, var(--accent) 32%, transparent);
+
+  color-scheme: light;
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.35s ease, color 0.35s ease;
+}
+
+h1, h2, h3, .display {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+button, input, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+button { cursor: pointer; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
