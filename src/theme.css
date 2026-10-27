@@ -387,3 +387,50 @@ hr {
     animation-duration: .01ms !important;
   }
 }
+
+
+/* Naomi Music accent palettes */
+
+:root,
+:root[data-palette="purple"] {
+  --accent: #8057ff;
+  --accent-2: #a78bfa;
+  --accent-grad: linear-gradient(110deg, #8057ff, #a044ff);
+  --accent-soft: rgba(128, 87, 255, .15);
+}
+
+:root[data-palette="blue"] {
+  --accent: #00bfae;
+  --accent-2: #398dff;
+  --accent-grad: linear-gradient(110deg, #00bfae, #398dff);
+  --accent-soft: rgba(0, 191, 174, .15);
+}
+
+:root[data-palette="sunset"] {
+  --accent: #f08a36;
+  --accent-2: #ff5277;
+  --accent-grad: linear-gradient(110deg, #f08a36, #ff5277);
+  --accent-soft: rgba(240, 138, 54, .15);
+}
+
+:root[data-palette="green"] {
+  --accent: #64c878;
+  --accent-2: #b0d957;
+  --accent-grad: linear-gradient(110deg, #64c878, #b0d957);
+  --accent-soft: rgba(100, 200, 120, .15);
+}
+
+:root[data-palette="rose"] {
+  --accent: #f06ca8;
+  --accent-2: #a875ff;
+  --accent-grad: linear-gradient(110deg, #f06ca8, #a875ff);
+  --accent-soft: rgba(240, 108, 168, .15);
+}
+
+:root[data-palette="gold"] {
+  --accent: #e5ad42;
+  --accent-2: #f07845;
+  --accent-grad: linear-gradient(110deg, #e5ad42, #f07845);
+  --accent-soft: rgba(229, 173, 66, .15);
+}
+
