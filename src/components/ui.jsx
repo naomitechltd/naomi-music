@@ -1,3 +1,4 @@
+// src/components/ui.js
 
 const STORAGE_MODE = "naomi-theme";
 const STORAGE_PALETTE = "naomi-music-palette";
@@ -48,6 +49,7 @@ export const theme = {
 };
 
 const validModes = ["auto", "light", "dark"];
+
 const validPalettes = [
   "purple",
   "blue",
@@ -59,7 +61,8 @@ const validPalettes = [
 
 function getSaved(key, fallback) {
   try {
-    return localStorage.getItem(key) || fallback;
+    const value = localStorage.getItem(key);
+    return value || fallback;
   } catch {
     return fallback;
   }
@@ -69,14 +72,14 @@ function save(key, value) {
   try {
     localStorage.setItem(key, value);
   } catch {
-    // Continue even if browser storage is unavailable.
+    // The theme still works if storage is unavailable.
   }
 }
 
 function getSystemTheme() {
   if (
     typeof window !== "undefined" &&
-    window.matchMedia
+    typeof window.matchMedia === "function"
   ) {
     return window.matchMedia("(prefers-color-scheme: light)").matches
       ? "light"
@@ -87,42 +90,71 @@ function getSystemTheme() {
 }
 
 function applyMode(mode) {
-  const resolvedMode = mode === "auto" ? getSystemTheme() : mode;
+  if (typeof document === "undefined") return "dark";
 
-  document.documentElement.dataset.theme = resolvedMode;
-  document.documentElement.dataset.themeMode = mode;
+  const selectedMode = validModes.includes(mode) ? mode : "dark";
+  const resolvedMode =
+    selectedMode === "auto" ? getSystemTheme() : selectedMode;
+
+  const root = document.documentElement;
+
+  // CSS uses data-theme="dark" or data-theme="light".
+  root.dataset.theme = resolvedMode;
+
+  // Preserve the selected preference separately.
+  root.dataset.themeMode = selectedMode;
 
   return resolvedMode;
+}
+
+function applyPalette(palette) {
+  if (typeof document === "undefined") return "purple";
+
+  const selectedPalette = validPalettes.includes(palette)
+    ? palette
+    : "purple";
+
+  // CSS palette selectors should use [data-palette="..."].
+  document.documentElement.dataset.palette = selectedPalette;
+
+  return selectedPalette;
 }
 
 export function initTheme() {
   if (typeof document === "undefined") return;
 
   let mode = getSaved(STORAGE_MODE, "dark");
+  let palette = getSaved(STORAGE_PALETTE, "purple");
 
-  // Support existing saved settings.
   if (!validModes.includes(mode)) mode = "dark";
-
-  const palette = getSaved(STORAGE_PALETTE, "purple");
+  if (!validPalettes.includes(palette)) palette = "purple";
 
   applyMode(mode);
+  applyPalette(palette);
 
-  document.documentElement.dataset.palette =
-    validPalettes.includes(palette) ? palette : "purple";
-
-  // Follow system appearance while Auto mode is active.
+  // Avoid registering multiple system listeners.
   if (typeof window !== "undefined" && window.matchMedia) {
-    const media = window.matchMedia("(prefers-color-scheme: light)");
+    if (!window.__naomiThemeListenerRegistered) {
+      const media = window.matchMedia(
+        "(prefers-color-scheme: light)"
+      );
 
-    if (media.addEventListener) {
-      media.addEventListener("change", () => {
-        const currentMode = getSaved(STORAGE_MODE, "dark");
-
-        if (currentMode === "auto") {
+      const handleSystemChange = () => {
+        if (getThemeMode() === "auto") {
           applyMode("auto");
-          window.dispatchEvent(new Event("naomi-theme-change"));
+          window.dispatchEvent(
+            new Event("naomi-theme-change")
+          );
         }
-      });
+      };
+
+      if (media.addEventListener) {
+        media.addEventListener("change", handleSystemChange);
+      } else if (media.addListener) {
+        media.addListener(handleSystemChange);
+      }
+
+      window.__naomiThemeListenerRegistered = true;
     }
   }
 
@@ -141,26 +173,32 @@ export function setTheme(mode) {
   window.dispatchEvent(new Event("naomi-theme-change"));
 }
 
+export function setThemeMode(mode) {
+  setTheme(mode);
+}
+
+export function getThemeMode() {
+  const mode = getSaved(STORAGE_MODE, "dark");
+  return validModes.includes(mode) ? mode : "dark";
+}
+
 export function currentTheme() {
   if (typeof document === "undefined") return "dark";
 
   return document.documentElement.dataset.theme || "dark";
 }
 
-export function getThemeMode() {
-  return getSaved(STORAGE_MODE, "dark");
-}
-
-export function setThemeMode(mode) {
-  setTheme(mode);
-}
-
 export function toggleTheme() {
-  setTheme(currentTheme() === "dark" ? "light" : "dark");
+  const current = currentTheme();
+
+  // Toggle the visible appearance, regardless of Auto mode.
+  setTheme(current === "dark" ? "light" : "dark");
 }
 
 export function getThemePalette() {
-  return getSaved(STORAGE_PALETTE, "purple");
+  const palette = getSaved(STORAGE_PALETTE, "purple");
+
+  return validPalettes.includes(palette) ? palette : "purple";
 }
 
 export function setThemePalette(palette) {
@@ -170,8 +208,8 @@ export function setThemePalette(palette) {
     ? palette
     : "purple";
 
-  document.documentElement.dataset.palette = selectedPalette;
   save(STORAGE_PALETTE, selectedPalette);
+  applyPalette(selectedPalette);
 
   window.dispatchEvent(new Event("naomi-palette-change"));
 }
