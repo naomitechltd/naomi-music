@@ -343,14 +343,46 @@ function StatCard({ icon: Icon, label, value, accent }) {
   );
 }
 
+
 function ThemeToggle() {
   const [mode, setMode] = React.useState(getThemeMode());
+  const [palette, setPalette] = React.useState(() => {
+    try {
+      return localStorage.getItem("naomi-music-palette") || "purple";
+    } catch {
+      return "purple";
+    }
+  });
 
-  const pick = (m) => {
-    setThemeMode(m);
-    setMode(m);
+  const palettes = [
+    { key: "purple", label: "Purple", color: "#8057ff", accent2: "#a78bfa" },
+    { key: "blue", label: "Ocean", color: "#00bfae", accent2: "#398dff" },
+    { key: "sunset", label: "Sunset", color: "#f08a36", accent2: "#ff5277" },
+    { key: "green", label: "Forest", color: "#64c878", accent2: "#b0d957" },
+    { key: "rose", label: "Rose", color: "#f06ca8", accent2: "#a875ff" },
+    { key: "gold", label: "Gold", color: "#e5ad42", accent2: "#f07845" },
+  ];
+
+  const pickMode = (nextMode) => {
+    setThemeMode(nextMode);
+    setMode(nextMode);
     window.dispatchEvent(new Event("naomi-theme-change"));
   };
+
+  const pickPalette = (nextPalette) => {
+    setPalette(nextPalette);
+
+    try {
+      localStorage.setItem("naomi-music-palette", nextPalette);
+    } catch {}
+
+    document.documentElement.dataset.palette = nextPalette;
+    window.dispatchEvent(new Event("naomi-palette-change"));
+  };
+
+  React.useEffect(() => {
+    document.documentElement.dataset.palette = palette;
+  }, [palette]);
 
   const opts = [
     { key: "auto", label: "Auto" },
@@ -359,34 +391,121 @@ function ThemeToggle() {
   ];
 
   return (
-    <div style={{ display: "flex", gap: 6, background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 10, padding: 3 }}>
-      {opts.map((o) => {
-        const active = mode === o.key;
-        return (
-          <button
-            key={o.key}
-            onClick={() => pick(o.key)}
-            style={{
-              flex: 1,
-              padding: "9px 12px",
-              background: active ? theme.accent : "transparent",
-              color: active ? "#fff" : theme.text,
-              border: "none",
-              borderRadius: 7,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: 13,
-              fontWeight: active ? 700 : 500,
-              opacity: active ? 1 : 0.75,
-            }}
-          >
-            {o.label}
-          </button>
-        );
-      })}
+    <div style={{ display: "grid", gap: 18 }}>
+      <div>
+        <div style={{
+          fontSize: 12,
+          opacity: 0.7,
+          marginBottom: 8
+        }}>
+          Display mode
+        </div>
+
+        <div style={{
+          display: "flex",
+          gap: 6,
+          background: theme.bg,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 10,
+          padding: 3
+        }}>
+          {opts.map((o) => {
+            const active = mode === o.key;
+
+            return (
+              <button
+                key={o.key}
+                onClick={() => pickMode(o.key)}
+                aria-pressed={active}
+                style={{
+                  flex: 1,
+                  padding: "10px 8px",
+                  background: active ? theme.accent : "transparent",
+                  color: active ? "#fff" : theme.text,
+                  border: "none",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  fontWeight: active ? 700 : 500
+                }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div style={{
+          fontSize: 12,
+          opacity: 0.7,
+          marginBottom: 10
+        }}>
+          Accent color
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gap: 9
+        }}>
+          {palettes.map((p) => {
+            const active = palette === p.key;
+
+            return (
+              <button
+                key={p.key}
+                onClick={() => pickPalette(p.key)}
+                aria-pressed={active}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 8px",
+                  background: active
+                    ? `${p.color}20`
+                    : theme.bg,
+                  border: `1px solid ${
+                    active ? p.color : theme.border
+                  }`,
+                  borderRadius: 9,
+                  color: theme.text,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 12,
+                  minWidth: 0
+                }}
+              >
+                <span style={{
+                  width: 17,
+                  height: 17,
+                  flexShrink: 0,
+                  borderRadius: "50%",
+                  background: `linear-gradient(135deg, ${p.color}, ${p.accent2})`,
+                  boxShadow: active
+                    ? `0 0 0 2px ${theme.bg}, 0 0 0 3px ${p.color}`
+                    : "none"
+                }} />
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{
+        fontSize: 11.5,
+        color: theme.textDim,
+        lineHeight: 1.5
+      }}>
+        Your appearance choices are saved on this device.
+      </div>
     </div>
   );
 }
+
 
 function PushToggle() {
   const [enabled, setEnabled] = React.useState(false);
