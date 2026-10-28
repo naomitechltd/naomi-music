@@ -572,3 +572,326 @@ hr {
   }
 }
 
+
+
+
+/* =========================================================
+   NAOMI MUSIC — PLAYER DOCK VISUAL REFRESH
+   Additive styling only. Existing playback logic is untouched.
+   ========================================================= */
+
+.naomi-player-mini {
+  box-sizing: border-box !important;
+  isolation: isolate;
+  gap: 14px !important;
+  padding: 11px 16px calc(13px + env(safe-area-inset-bottom)) !important;
+  background:
+    linear-gradient(115deg, var(--surface), var(--bg-raised)) !important;
+  border: 1px solid var(--border) !important;
+  border-bottom: 0 !important;
+  border-radius: 20px 20px 0 0 !important;
+  box-shadow: 0 -12px 38px rgba(0, 0, 0, 0.22) !important;
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  transition: background 180ms ease, box-shadow 180ms ease;
+}
+
+.naomi-player-mini-art {
+  width: 50px !important;
+  height: 50px !important;
+  border-radius: 12px !important;
+  object-fit: cover !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+}
+
+.naomi-player-mini > div:nth-of-type(1) {
+  padding: 2px 0;
+}
+
+.naomi-player-mini > div:nth-of-type(1) > div:first-child {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.25px;
+}
+
+.naomi-player-mini > div:nth-of-type(1) > div:nth-child(2) {
+  margin-top: 4px;
+  font-size: 12px !important;
+}
+
+.naomi-player-mini button {
+  position: relative;
+  z-index: 2;
+  min-width: 40px;
+  min-height: 40px;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.naomi-player-mini button:hover {
+  background: rgba(127, 92, 255, 0.14) !important;
+}
+
+.naomi-player-mini button:active {
+  transform: scale(0.92);
+}
+
+.naomi-player-mini > div:last-child {
+  height: 3px !important;
+  overflow: hidden;
+  border-radius: 0 0 20px 20px;
+  background: var(--border) !important;
+}
+
+.naomi-player-mini > div:last-child > div {
+  border-radius: inherit;
+  box-shadow: 0 0 12px var(--accent);
+}
+
+/* Full-screen player */
+.naomi-player-full {
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  padding-bottom: env(safe-area-inset-bottom) !important;
+  background:
+    radial-gradient(
+      ellipse at 50% 30%,
+      color-mix(in srgb, var(--accent) 19%, transparent),
+      transparent 55%
+    ),
+    var(--player-bg, var(--bg)) !important;
+  color: var(--text) !important;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.naomi-player-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--bg) 76%, transparent);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.naomi-player-full button {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    opacity 160ms ease;
+}
+
+.naomi-player-full button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.naomi-player-full button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.naomi-player-art-stage {
+  flex: 1 0 auto !important;
+  min-height: 220px !important;
+  padding: 24px clamp(22px, 7vw, 60px) !important;
+}
+
+.naomi-player-art {
+  width: min(100%, 390px) !important;
+  height: auto !important;
+  max-height: min(43vh, 390px) !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: cover !important;
+  border-radius: 22px !important;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  animation: naomi-player-art-in 420ms ease both;
+}
+
+.naomi-player-details {
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding:
+    20px clamp(22px, 7vw, 60px)
+    calc(28px + env(safe-area-inset-bottom)) !important;
+  margin: 0 auto;
+  max-width: 620px;
+}
+
+.naomi-player-details > div:first-child > div:first-child {
+  font-size: clamp(21px, 5vw, 28px) !important;
+  font-weight: 750 !important;
+  letter-spacing: -0.7px;
+  line-height: 1.25;
+}
+
+.naomi-player-details > div:first-child > div:nth-child(2) {
+  font-size: 14px !important;
+  line-height: 1.5;
+}
+
+.naomi-player-details > div:nth-child(2) {
+  height: 5px !important;
+  border-radius: 99px !important;
+  overflow: visible;
+  touch-action: manipulation;
+}
+
+.naomi-player-details > div:nth-child(2) > div {
+  border-radius: inherit !important;
+}
+
+.naomi-player-details > div:nth-child(3) {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px !important;
+}
+
+.naomi-player-details > div:nth-child(4) {
+  gap: clamp(26px, 8vw, 44px) !important;
+  margin-top: 28px !important;
+}
+
+.naomi-player-details > div:nth-child(4) button {
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+}
+
+.naomi-player-details > div:nth-child(4) button:nth-child(2) {
+  width: 76px !important;
+  height: 76px !important;
+  min-width: 76px;
+  min-height: 76px;
+  background: var(--accent) !important;
+  box-shadow:
+    0 8px 28px color-mix(in srgb, var(--accent) 38%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.naomi-player-details > div:nth-child(4) button:nth-child(2):hover {
+  filter: brightness(1.08);
+}
+
+.naomi-player-details > div:nth-child(5) {
+  margin-top: 24px !important;
+}
+
+.naomi-player-details > div:nth-child(5) button {
+  min-height: 42px;
+}
+
+.naomi-player-full > div[style*="position: absolute"][style*="zIndex"] {
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  border-radius: 16px !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* Motion */
+@keyframes naomi-player-art-in {
+  from {
+    opacity: 0.65;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Smaller phones */
+@media (max-width: 480px) {
+  .naomi-player-mini {
+    gap: 10px !important;
+    padding-left: 12px !important;
+    padding-right: 10px !important;
+  }
+
+  .naomi-player-mini-art {
+    width: 46px !important;
+    height: 46px !important;
+  }
+
+  .naomi-player-mini button {
+    min-width: 36px;
+    min-height: 40px;
+  }
+
+  .naomi-player-art-stage {
+    min-height: 190px !important;
+    padding: 18px 28px !important;
+  }
+
+  .naomi-player-art {
+    width: min(100%, 340px) !important;
+    max-height: min(39vh, 340px) !important;
+    border-radius: 18px !important;
+  }
+
+  .naomi-player-details {
+    padding: 14px 22px calc(22px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .naomi-player-details > div:nth-child(4) {
+    margin-top: 24px !important;
+  }
+
+  .naomi-player-details > div:nth-child(4) button:nth-child(2) {
+    width: 68px !important;
+    height: 68px !important;
+    min-width: 68px;
+    min-height: 68px;
+  }
+}
+
+/* Short screens: keep controls reachable by scrolling */
+@media (max-height: 650px) {
+  .naomi-player-art-stage {
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .naomi-player-art {
+    width: min(58vw, 230px) !important;
+    max-height: 32vh !important;
+  }
+
+  .naomi-player-details {
+    padding-top: 10px !important;
+  }
+
+  .naomi-player-details > div:nth-child(4) {
+    margin-top: 16px !important;
+  }
+
+  .naomi-player-details > div:nth-child(4) button:nth-child(2) {
+    width: 60px !important;
+    height: 60px !important;
+    min-width: 60px;
+    min-height: 60px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .naomi-player-full *,
+  .naomi-player-mini * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
