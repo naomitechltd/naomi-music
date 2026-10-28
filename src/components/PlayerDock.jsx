@@ -292,7 +292,146 @@ export function PlayerDock({
         .pd-lyric-line{padding:7px 0;color:#a9a1bd;transition:color .2s,transform .2s;font-size:15px;line-height:1.5}
         .pd-lyric-line.active{color:#d5bdff;font-weight:800;transform:scale(1.02)}
         @media(max-width:560px){.player-dock{left:7px;right:7px;bottom:7px}.pd-main{gap:8px;padding:9px}.pd-art{width:42px;height:42px;flex-basis:42px}.pd-btn{min-width:32px;height:34px}.pd-volume-wrap{display:none}.pd-title{font-size:12px}.pd-artist{font-size:11px}.pd-actions{gap:2px}}
-      `}</style>
+      `}
+
+/* NAOMi Music — responsive mobile player */
+
+@media (max-width: 600px) {
+  .player-dock {
+    left: 8px;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    border-radius: 17px;
+    max-width: 100%;
+  }
+
+  .pd-main {
+    gap: 9px;
+    padding: 9px 10px;
+  }
+
+  .pd-art {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 10px;
+  }
+
+  .pd-track {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pd-title {
+    font-size: 12px;
+  }
+
+  .pd-artist {
+    font-size: 11px;
+    margin-top: 3px;
+  }
+
+  .pd-actions {
+    gap: 2px;
+  }
+
+  .pd-btn {
+    min-width: 31px;
+    height: 34px;
+    font-size: 15px;
+    border-radius: 9px;
+  }
+
+  .pd-play {
+    min-width: 36px;
+    height: 36px;
+    border-radius: 50%;
+  }
+
+  .pd-progress {
+    gap: 7px;
+    padding: 0 11px 9px;
+    font-size: 10px;
+  }
+
+  .pd-progress .pd-range {
+    min-width: 30px;
+  }
+
+  .pd-volume-wrap {
+    max-width: 100%;
+  }
+
+  .pd-volume {
+    width: 90px;
+  }
+
+  .pd-expanded {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .pd-queue {
+    max-height: 32vh;
+    padding: 8px;
+  }
+
+  .pd-queue-item {
+    padding: 10px 7px;
+  }
+
+  .pd-lyrics {
+    max-height: 55dvh;
+    margin-bottom: 8px;
+  }
+
+  .pd-lyrics-body {
+    max-height: calc(55dvh - 48px);
+    padding: 12px;
+  }
+
+  .pd-lyric-line {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+}
+
+@media (max-width: 380px) {
+  .pd-main {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .pd-art {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+
+  .pd-title {
+    font-size: 11px;
+  }
+
+  .pd-artist {
+    font-size: 10px;
+  }
+
+  .pd-actions {
+    gap: 0;
+  }
+
+  .pd-actions .pd-btn {
+    min-width: 27px;
+    font-size: 13px;
+  }
+
+  .pd-actions .pd-play {
+    min-width: 33px;
+  }
+}
+
+
+</style>
 
       {lyricsOpen && (
         <section className="pd-lyrics" aria-label="Lyrics">
