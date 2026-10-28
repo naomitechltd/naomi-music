@@ -213,3 +213,85 @@ export function setThemePalette(palette) {
 
   window.dispatchEvent(new Event("naomi-palette-change"));
 }
+
+export function Button({
+  children,
+  onClick,
+  disabled = false,
+  style = {},
+  type = "button",
+}) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "12px 18px",
+        border: "none",
+        borderRadius: "12px",
+        background: theme.accentGrad,
+        color: "#fff",
+        fontWeight: 700,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+        fontFamily: "inherit",
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <label
+        style={{
+          display: "block",
+          marginBottom: 7,
+          color: theme.text,
+          fontSize: 13,
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+export function ErrorNote({ message }) {
+  if (!message) return null;
+
+  return (
+    <div
+      role="alert"
+      style={{
+        color: theme.danger,
+        fontSize: 13,
+        margin: "12px 0",
+        overflowWrap: "anywhere",
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
+export function inputStyle() {
+  return {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "12px",
+    border: `1px solid ${theme.border}`,
+    borderRadius: "10px",
+    background: theme.surface,
+    color: theme.text,
+    fontSize: "14px",
+    fontFamily: "inherit",
+    outline: "none",
+  };
+}
