@@ -21,6 +21,8 @@ import {
   Query,
 } from "./lib/appwrite";
 
+import ThemeSettings from "./components/ThemeSettings";
+
 import { fetchMyRole } from "./lib/role";
 import { setRole } from "./lib/api";
 
@@ -694,6 +696,11 @@ export default function App() {
           path="/artists"
           element={requireAuth(<ArtistsDirectoryView />)}
         />
+
+<Route
+  path="/settings/theme"
+  element={requireAuth(<ThemeSettings />)}
+/>
 
         <Route
           path="/song/:id"
