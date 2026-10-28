@@ -13,7 +13,7 @@ import React, { useEffect, useRef, useState } from "react";
  *   onTogglePlay, onNext, onPrevious, onSeek, onVolumeChange: callbacks
  *   queue: array of tracks (optional)
  */
-export default function PlayerDock({
+export function PlayerDock({
   track = null,
   isPlaying: controlledIsPlaying,
   onTogglePlay,
