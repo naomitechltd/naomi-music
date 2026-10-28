@@ -1,487 +1,752 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Search, LayoutGrid, List, Menu as ListIcon, ChevronLeft, X } from "lucide-react";
-import { tablesDB, DATABASE_ID, SONGS_TABLE_ID, Query, fileUrl } from "../lib/appwrite";
-import { theme, inputStyle } from "../components/ui";
-import { getRecentlyPlayed } from "../lib/recent";
-import { track } from "../lib/tracker";
 
-const VIEW_KEY = "naomi_browse_view";
+import React, { useMemo, useState } from "react";
+import { theme } from "../components/ui";
+import {
+  Search,
+  LayoutGrid,
+  List,
+  Music,
+  Play,
+  Heart,
+  Flame,
+  Sparkles,
+} from "lucide-react";
 
-// Genre → gradient. Add or change colours freely.
-const GENRE_STYLES = {
-  "Afrobeats":  { bg: "linear-gradient(135deg, #ff6b35 0%, #c41e3a 100%)", emoji: "🌍" },
-  "Amapiano":   { bg: "linear-gradient(135deg, #f9c74f 0%, #e07a1f 100%)", emoji: "🎹" },
-  "Hip Hop":    { bg: "linear-gradient(135deg, #3a1c71 0%, #d76d77 100%)", emoji: "🎤" },
-  "R&B":        { bg: "linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)", emoji: "💜" },
-  "Pop":        { bg: "linear-gradient(135deg, #ff5f6d 0%, #ffc371 100%)", emoji: "✨" },
-  "Gospel":     { bg: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)", emoji: "🙏" },
-  "House":      { bg: "linear-gradient(135deg, #00b4db 0%, #0083b0 100%)", emoji: "🏠" },
-  "Kwaito":     { bg: "linear-gradient(135deg, #ee9ca7 0%, #ffdde1 100%)", emoji: "💃" },
-  "Jazz":       { bg: "linear-gradient(135deg, #42275a 0%, #734b6d 100%)", emoji: "🎷" },
-  "Other":      { bg: "linear-gradient(135deg, #4b6cb7 0%, #182848 100%)", emoji: "🎵" },
-};
+export function BrowseView({
+  currentUser,
+  onPlaySong,
+  songs = [],
+}) {
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState("grid");
+  const [category, setCategory] = useState("All");
+  const [selectedMood, setSelectedMood] = useState("All");
+  const [selectedGenre, setSelectedGenre] = useState("All");
 
-const MOOD_CARDS = [
-  { label: "Fresh drops",    key: "fresh",     bg: "linear-gradient(135deg, #7c5cff 0%, #3a1c71 100%)", emoji: "🌟" },
-  { label: "Most liked",     key: "liked",     bg: "linear-gradient(135deg, #ff4d6d 0%, #8a1030 100%)", emoji: "❤️" },
-  { label: "Trending",       key: "trending",  bg: "linear-gradient(135deg, #ff8008 0%, #ffc837 100%)", emoji: "🔥" },
-];
-
-export function BrowseView({ currentUser, onPlaySong }) {
-  const navigate = useNavigate();
-  const [songs, setSongs] = useState([]);
-  const [likes, setLikes] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [view, setView] = useState(() => localStorage.getItem(VIEW_KEY) || "grid");
-  const [activeGenre, setActiveGenre] = useState(null);
-  const [activeMood, setActiveMood] = useState(null);
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [recent, setRecent] = useState([]);
-
-  useEffect(() => { localStorage.setItem(VIEW_KEY, view); }, [view]);
-
-  useEffect(() => { setRecent(getRecentlyPlayed()); }, []);
-
-  // Log search terms after 1.2s of no typing
-  useEffect(() => {
-    if (!query.trim()) return;
-    const t = setTimeout(() => {
-      track("search", { metadata: query.trim().slice(0, 100) });
-    }, 1200);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  // Load songs
-  useEffect(() => {
-    tablesDB
-      .listRows(DATABASE_ID, SONGS_TABLE_ID, [
-        Query.equal("status", "approved"),
-        Query.limit(500),
-      ])
-      .then((res) => setSongs(res.rows))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Load like counts for mood sorting
-  useEffect(() => {
-    tablesDB
-      .listRows(DATABASE_ID, "6ab1ffd3000a581a3158", [Query.limit(1000)])
-      .then((res) => {
-        const map = {};
-        for (const row of res.rows) {
-          map[row.songId] = (map[row.songId] || 0) + 1;
-        }
-        setLikes(map);
-      })
-      .catch(() => {});
-  }, []);
-
-  // Genre counts
-  const genreCounts = useMemo(() => {
-    const c = {};
-    for (const s of songs) {
-      const g = s.genre || "Other";
-      c[g] = (c[g] || 0) + 1;
-    }
-    return c;
+  const recentSongs = useMemo(() => {
+    return [...songs]
+      .filter((song) => song && (song.id || song.$id))
+      .slice(0, 8);
   }, [songs]);
 
-  // Which genres actually have songs
-  const availableGenres = useMemo(
-    () => Object.keys(genreCounts).sort((a, b) => genreCounts[b] - genreCounts[a]),
-    [genreCounts]
-  );
+  const moods = [
+    {
+      label: "Fresh drops",
+      icon: "✨",
+      gradient: theme.accentGrad,
+    },
+    {
+      label: "Most liked",
+      icon: "❤️",
+      gradient: "linear-gradient(135deg,#f43f5e,#be123c)",
+    },
+    {
+      label: "Trending",
+      icon: "🔥",
+      gradient: "linear-gradient(135deg,#f59e0b,#ea580c)",
+    },
+  ];
 
-  const filtered = useMemo(() => {
-    let list = songs;
+  const genres = [
+    {
+      label: "Hip Hop",
+      icon: "🎤",
+      gradient: "linear-gradient(135deg,#6b21a8,#db2777)",
+    },
+    {
+      label: "Amapiano",
+      icon: "🎹",
+      gradient: "linear-gradient(135deg,#0369a1,#06b6d4)",
+    },
+    {
+      label: "Gospel",
+      icon: "🙏",
+      gradient: "linear-gradient(135deg,#047857,#34d399)",
+    },
+    {
+      label: "Poetry",
+      icon: "📝",
+      gradient: "linear-gradient(135deg,#9a3412,#f97316)",
+    },
+  ];
 
-    // Type filter
-    if (typeFilter === "song") list = list.filter((s) => (s.contentType || "song") === "song");
-    else if (typeFilter === "poem") list = list.filter((s) => s.contentType === "poem");
+  const getId = (song) => song?.$id ?? song?.id;
 
-    // Genre filter
-    if (activeGenre) list = list.filter((s) => (s.genre || "Other") === activeGenre);
+  const getTitle = (song) =>
+    song?.title || song?.name || "Untitled";
 
-    // Mood filter
-    if (activeMood === "fresh") {
-      list = [...list].sort((a, b) => new Date(b.$createdAt) - new Date(a.$createdAt));
-    } else if (activeMood === "liked") {
-      list = [...list].sort((a, b) => (likes[b.$id] || 0) - (likes[a.$id] || 0));
-    } else if (activeMood === "trending") {
-      list = [...list].sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
-    }
+  const getArtist = (song) =>
+    song?.artist ||
+    song?.artistName ||
+    song?.uploadedBy ||
+    "Unknown artist";
 
-    // Search
-    const q = query.trim().toLowerCase();
-    if (q) {
-      list = list.filter((s) =>
-        [s.title, s.artistName, s.genre, s.albumName, s.lyrics]
-          .filter(Boolean)
-          .some((field) => field.toLowerCase().includes(q))
+  const getCover = (song) =>
+    song?.coverUrl ||
+    song?.cover ||
+    song?.imageUrl ||
+    song?.artworkUrl ||
+    "";
+
+  const getType = (song) =>
+    String(song?.type || song?.category || "Song").toLowerCase();
+
+  const filteredSongs = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    let result = [...songs];
+
+    if (category === "Songs") {
+      result = result.filter(
+        (song) => !getType(song).includes("poem")
+      );
+    } else if (category === "Poems") {
+      result = result.filter(
+        (song) => getType(song).includes("poem")
       );
     }
 
-    return list;
-  }, [songs, activeGenre, activeMood, query, likes, typeFilter]);
+    if (selectedGenre !== "All") {
+      result = result.filter(
+        (song) =>
+          String(song?.genre || "").toLowerCase() ===
+          selectedGenre.toLowerCase()
+      );
+    }
 
-  const clearFilters = () => { setActiveGenre(null); setActiveMood(null); };
+    if (selectedMood === "Most liked") {
+      result.sort(
+        (a, b) => Number(b?.likes || 0) - Number(a?.likes || 0)
+      );
+    } else if (selectedMood === "Trending") {
+      result.sort(
+        (a, b) =>
+          Number(b?.plays || b?.playCount || 0) -
+          Number(a?.plays || a?.playCount || 0)
+      );
+    }
+
+    if (term) {
+      result = result.filter((song) => {
+        const searchable = [
+          getTitle(song),
+          getArtist(song),
+          song?.genre || "",
+          song?.album || "",
+          song?.lyrics || "",
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return searchable.includes(term);
+      });
+    }
+
+    return result;
+  }, [songs, search, category, selectedMood, selectedGenre]);
+
+  const cardStyle = {
+    background: theme.bgRaised,
+    border: `1px solid ${theme.border}`,
+    borderRadius: theme.radiusMd,
+    overflow: "hidden",
+    boxShadow: theme.shadowSm,
+    minWidth: 0,
+  };
+
+  const sectionLabel = {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: "0.1em",
+    color: theme.textMuted,
+    margin: "0 0 16px",
+  };
+
+  const filterButton = (active) => ({
+    padding: "10px 20px",
+    borderRadius: theme.radiusPill,
+    border: `1px solid ${active ? "transparent" : theme.border}`,
+    background: active ? theme.accentGrad : "transparent",
+    color: active ? theme.accentFg : theme.text,
+    fontWeight: 600,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  });
+
+  const playSong = (song) => {
+    if (typeof onPlaySong === "function") {
+      onPlaySong(song);
+    }
+  };
+
+  const renderSong = (song) => {
+    const id = getId(song);
+    const cover = getCover(song);
+
+    return (
+      <article
+        key={id}
+        style={{
+          ...cardStyle,
+          cursor: "pointer",
+          display: view === "list" ? "flex" : "block",
+          alignItems: "center",
+          gap: view === "list" ? 14 : 0,
+          padding: view === "list" ? 10 : 0,
+        }}
+        onClick={() => playSong(song)}
+      >
+        <div
+          style={{
+            width: view === "list" ? 64 : "100%",
+            height: view === "list" ? 64 : "auto",
+            aspectRatio: view === "list" ? undefined : "1 / 1",
+            flexShrink: 0,
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: view === "list" ? theme.radiusMd : 0,
+            background: theme.card,
+          }}
+        >
+          {cover ? (
+            <img
+              src={cover}
+              alt={getTitle(song)}
+              loading="lazy"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                position: view === "list" ? "static" : "absolute",
+                inset: 0,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                minHeight: view === "list" ? 64 : 130,
+                display: "grid",
+                placeItems: "center",
+                color: theme.textMuted,
+              }}
+            >
+              <Music size={30} />
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: view === "list" ? 0 : 12,
+          }}
+        >
+          <p
+            style={{
+              margin: "0 0 5px",
+              fontWeight: 700,
+              fontSize: 14,
+              color: theme.text,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {getTitle(song)}
+          </p>
+
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              color: theme.textMuted,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {getArtist(song)}
+          </p>
+        </div>
+
+        {view === "list" && (
+          <button
+            type="button"
+            aria-label={`Play ${getTitle(song)}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              playSong(song);
+            }}
+            style={{
+              border: 0,
+              borderRadius: theme.radiusPill,
+              background: theme.accent,
+              color: theme.accentFg,
+              width: 42,
+              height: 42,
+              display: "grid",
+              placeItems: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Play size={18} fill="currentColor" />
+          </button>
+        )}
+      </article>
+    );
+  };
 
   return (
-    <div style={{ maxWidth: 1000, margin: "0 auto", padding: "30px 20px 120px" }}>
-      {/* Header */}
-      <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 18 }}>The collection</div>
+    <main
+      style={{
+        maxWidth: 1000,
+        width: "100%",
+        margin: "0 auto",
+        padding: "24px 20px 120px",
+        boxSizing: "border-box",
+        color: theme.text,
+      }}
+    >
+      <h2
+        style={{
+          fontFamily: theme.fontDisplay,
+          fontSize: 36,
+          margin: "0 0 24px",
+          letterSpacing: "-0.04em",
+        }}
+      >
+        The collection
+      </h2>
 
-      {/* Search + view toggle */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 22, alignItems: "center" }}>
-        <div style={{ position: "relative", flex: 1, maxWidth: 420 }}>
-          <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", opacity: 0.5 }} />
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          marginBottom: 28,
+          alignItems: "stretch",
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            background: theme.bgRaised,
+            borderRadius: theme.radiusMd,
+            padding: "0 14px",
+            border: `1px solid ${theme.border}`,
+          }}
+        >
+          <Search size={18} color={theme.textMuted} />
+
           <input
-            style={{ ...inputStyle(), paddingLeft: 36 }}
+            type="search"
+            aria-label="Search music"
             placeholder="Search songs, artists, lyrics..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              background: "transparent",
+              border: "none",
+              color: theme.text,
+              padding: "14px 0",
+              outline: "none",
+              fontSize: 14,
+            }}
           />
         </div>
 
-        <div style={{ display: "flex", gap: 2, background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 8, padding: 2 }}>
-          <ViewBtn icon={LayoutGrid} active={view === "grid"} onClick={() => setView("grid")} title="Grid" />
-          <ViewBtn icon={List} active={view === "list"} onClick={() => setView("list")} title="List" />
-          <ViewBtn icon={ListIcon} active={view === "compact"} onClick={() => setView("compact")} title="Compact" />
+        <div
+          style={{
+            display: "flex",
+            background: theme.bgRaised,
+            borderRadius: theme.radiusMd,
+            border: `1px solid ${theme.border}`,
+            overflow: "hidden",
+            flexShrink: 0,
+          }}
+        >
+          <button
+            type="button"
+            aria-label="Grid view"
+            aria-pressed={view === "grid"}
+            onClick={() => setView("grid")}
+            style={{
+              background: view === "grid" ? theme.accent : "transparent",
+              border: 0,
+              padding: 12,
+              color:
+                view === "grid" ? theme.accentFg : theme.textMuted,
+              cursor: "pointer",
+            }}
+          >
+            <LayoutGrid size={20} />
+          </button>
+
+          <button
+            type="button"
+            aria-label="List view"
+            aria-pressed={view === "list"}
+            onClick={() => setView("list")}
+            style={{
+              background: view === "list" ? theme.accent : "transparent",
+              border: 0,
+              padding: 12,
+              color:
+                view === "list" ? theme.accentFg : theme.textMuted,
+              cursor: "pointer",
+            }}
+          >
+            <List size={20} />
+          </button>
         </div>
       </div>
 
-      {recent.length > 0 && (
-        <Section title="Recently played">
-          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6 }}>
-            {recent.map((r) => (
+      {recentSongs.length > 0 && (
+        <section style={{ marginBottom: 30 }}>
+          <p style={sectionLabel}>RECENTLY PLAYED</p>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              overflowX: "auto",
+              paddingBottom: 12,
+            }}
+          >
+            {recentSongs.map((song) => (
               <button
-                key={r.$id}
-                onClick={() => {
-                  if (r.contentType === "poem") return;
-                  onPlaySong(recent, recent.findIndex((x) => x.$id === r.$id));
-                }}
+                key={getId(song)}
+                type="button"
+                onClick={() => playSong(song)}
                 style={{
-                  flexShrink: 0,
-                  width: 120,
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
+                  width: 140,
+                  minWidth: 140,
                   textAlign: "left",
-                  color: "inherit",
-                  fontFamily: "inherit",
+                  padding: 0,
+                  border: 0,
+                  background: "transparent",
+                  color: theme.text,
+                  cursor: "pointer",
                 }}
               >
-                <img
-                  src={fileUrl(r.coverArtField)}
-                  alt={r.title}
-                  style={{ width: 120, height: 120, borderRadius: 8, objectFit: "cover", background: theme.bgRaised, border: `1px solid ${theme.border}` }}
-                />
-                <div style={{ fontSize: 12.5, fontWeight: 600, marginTop: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</div>
-                <div style={{ fontSize: 11, opacity: 0.55, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.artistName}</div>
+                <div
+                  style={{
+                    width: 140,
+                    height: 140,
+                    borderRadius: theme.radiusMd,
+                    background: theme.card,
+                    marginBottom: 12,
+                    overflow: "hidden",
+                    boxShadow: theme.shadowMd,
+                    border: `1px solid ${theme.border}`,
+                  }}
+                >
+                  {getCover(song) ? (
+                    <img
+                      src={getCover(song)}
+                      alt={getTitle(song)}
+                      loading="lazy"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        height: "100%",
+                        display: "grid",
+                        placeItems: "center",
+                        color: theme.textMuted,
+                      }}
+                    >
+                      <Music size={32} />
+                    </div>
+                  )}
+                </div>
+
+                <p
+                  style={{
+                    margin: "0 0 4px",
+                    fontWeight: 600,
+                    fontSize: 14,
+                  }}
+                >
+                  {getTitle(song)}
+                </p>
+
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 12,
+                    color: theme.textMuted,
+                  }}
+                >
+                  {getArtist(song)}
+                </p>
               </button>
             ))}
           </div>
-        </Section>
+        </section>
       )}
 
-      {/* Type chips */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        {[
-          { key: "all", label: "All" },
-          { key: "song", label: "Songs" },
-          { key: "poem", label: "Poems" },
-        ].map((t) => (
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          overflowX: "auto",
+          paddingBottom: 8,
+          marginBottom: 30,
+        }}
+      >
+        {["All", "Songs", "Poems"].map((item) => (
           <button
-            key={t.key}
-            onClick={() => setTypeFilter(t.key)}
-            style={{
-              padding: "7px 16px",
-              borderRadius: 20,
-              background: typeFilter === t.key ? theme.accent : "transparent",
-              color: typeFilter === t.key ? "#fff" : theme.text,
-              border: `1px solid ${typeFilter === t.key ? theme.accent : theme.border}`,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: 12.5,
-              fontWeight: 600,
-            }}
+            key={item}
+            type="button"
+            aria-pressed={category === item}
+            onClick={() => setCategory(item)}
+            style={filterButton(category === item)}
           >
-            {t.label}
+            {item}
           </button>
         ))}
       </div>
 
-      {/* Mood cards */}
-      <Section title="Browse by mood">
-        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6, scrollbarWidth: "none" }}>
-          {MOOD_CARDS.map((m) => (
-            <MoodCard
-              key={m.key}
-              label={m.label}
-              emoji={m.emoji}
-              bg={m.bg}
-              active={activeMood === m.key}
-              onClick={() => setActiveMood(activeMood === m.key ? null : m.key)}
-            />
-          ))}
-        </div>
-      </Section>
+      <section style={{ marginBottom: 32 }}>
+        <p style={sectionLabel}>BROWSE BY MOOD</p>
 
-      {/* Genre cards */}
-      {availableGenres.length > 0 && (
-        <Section title="Genres">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
-            {availableGenres.map((g) => {
-              const style = GENRE_STYLES[g] || GENRE_STYLES.Other;
-              return (
-                <GenreCard
-                  key={g}
-                  label={g}
-                  count={genreCounts[g]}
-                  bg={style.bg}
-                  emoji={style.emoji}
-                  active={activeGenre === g}
-                  onClick={() => setActiveGenre(activeGenre === g ? null : g)}
-                />
-              );
-            })}
-          </div>
-        </Section>
-      )}
-
-      {/* Filter status */}
-      {(activeGenre || activeMood || query) && (
         <div
           style={{
-            display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
-            padding: "8px 12px",
-            background: theme.bgRaised,
-            border: `1px solid ${theme.border}`,
-            borderRadius: 8,
-            fontSize: 13,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))",
+            gap: 14,
           }}
         >
-          <span style={{ opacity: 0.75 }}>
-            {filtered.length} {filtered.length === 1 ? "song" : "songs"}
-            {activeGenre ? ` · ${activeGenre}` : ""}
-            {activeMood ? ` · ${MOOD_CARDS.find(m => m.key === activeMood)?.label}` : ""}
-            {query ? ` · "${query}"` : ""}
-          </span>
-          <button
-            onClick={() => { clearFilters(); setQuery(""); }}
-            style={{
-              marginLeft: "auto",
-              background: "none", border: "none",
-              color: theme.accent, cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 4,
-              fontSize: 12.5, fontFamily: "inherit",
-            }}
-          >
-            <X size={13} /> Clear
-          </button>
-        </div>
-      )}
+          {moods.map((mood) => {
+            const active = selectedMood === mood.label;
 
-      {loading && <div style={{ opacity: 0.6, fontSize: 13 }}>Loading...</div>}
-      {!loading && filtered.length === 0 && (
-        <div style={{ opacity: 0.6, fontSize: 13 }}>
-          {songs.length === 0 ? "No songs yet." : "Nothing matches — try another filter."}
-        </div>
-      )}
-
-      {/* Grid view */}
-      {view === "grid" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 18 }}>
-          {filtered.map((s, i) => {
-            const isPoem = s.contentType === "poem";
             return (
-              <Link
-                key={s.$id}
-                to={`/song/${s.$id}`}
-                onClick={(e) => {
-                  if (isPoem) return; // poems navigate to their page
-                  e.preventDefault();
-                  onPlaySong(filtered.filter((x) => (x.contentType || "song") === "song"), i);
+              <button
+                key={mood.label}
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  setSelectedMood(active ? "All" : mood.label)
+                }
+                style={{
+                  minHeight: 110,
+                  borderRadius: theme.radiusLg,
+                  background: mood.gradient,
+                  padding: 16,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-end",
+                  alignItems: "flex-start",
+                  textAlign: "left",
+                  color: "#fff",
+                  boxShadow: theme.shadowMd,
+                  cursor: "pointer",
+                  border: active
+                    ? "2px solid white"
+                    : "2px solid transparent",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
-                style={{ textDecoration: "none", color: "inherit", display: "block", position: "relative" }}
               >
-                <img
-                  src={fileUrl(s.coverArtField)}
-                  alt={s.title}
-                  style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 6, background: theme.bgRaised, border: `1px solid ${theme.border}` }}
-                />
-                {isPoem && (
-                  <div style={{
-                    position: "absolute", top: 6, right: 6,
-                    background: "rgba(0,0,0,0.7)", color: "#fff",
-                    fontSize: 10, fontWeight: 700, padding: "2px 7px",
-                    borderRadius: 10, letterSpacing: "0.04em",
-                  }}>
-                    POEM
-                  </div>
-                )}
-                <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-                <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.artistName}</div>
-              </Link>
+                <span
+                  style={{
+                    fontSize: 24,
+                    position: "absolute",
+                    top: 12,
+                    left: 16,
+                  }}
+                >
+                  {mood.icon}
+                </span>
+
+                <span style={{ fontWeight: 700, fontSize: 15 }}>
+                  {mood.label}
+                </span>
+              </button>
             );
           })}
         </div>
-      )}
+      </section>
 
-      {/* List view */}
-      {view === "list" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {filtered.map((s, i) => (
-            <Link
-              key={s.$id}
-              to={`/song/${s.$id}`}
-              onClick={(e) => { e.preventDefault(); onPlaySong(filtered, i); }}
+      <section style={{ marginBottom: 32 }}>
+        <p style={sectionLabel}>GENRES</p>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))",
+            gap: 14,
+          }}
+        >
+          {genres.map((genre) => {
+            const active = selectedGenre === genre.label;
+
+            return (
+              <button
+                key={genre.label}
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  setSelectedGenre(
+                    active ? "All" : genre.label
+                  )
+                }
+                style={{
+                  minHeight: 135,
+                  borderRadius: theme.radiusLg,
+                  background: genre.gradient,
+                  padding: 18,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-end",
+                  alignItems: "flex-start",
+                  color: "#fff",
+                  cursor: "pointer",
+                  boxShadow: theme.shadowMd,
+                  border: active
+                    ? "2px solid white"
+                    : "2px solid transparent",
+                  position: "relative",
+                  textAlign: "left",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 28,
+                    position: "absolute",
+                    top: 14,
+                    right: 14,
+                  }}
+                >
+                  {genre.icon}
+                </span>
+
+                <span
+                  style={{
+                    fontFamily: theme.fontDisplay,
+                    fontSize: 21,
+                    fontWeight: 700,
+                  }}
+                >
+                  {genre.label}
+                </span>
+
+                <span style={{ fontSize: 12, opacity: 0.85 }}>
+                  Browse genre
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <p style={{ ...sectionLabel, margin: 0 }}>
+            {search ? "SEARCH RESULTS" : "EXPLORE MUSIC"}
+          </p>
+
+          <span style={{ fontSize: 12, color: theme.textMuted }}>
+            {filteredSongs.length}{" "}
+            {filteredSongs.length === 1 ? "track" : "tracks"}
+          </span>
+        </div>
+
+        {filteredSongs.length > 0 ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                view === "grid"
+                  ? "repeat(auto-fill, minmax(145px, 1fr))"
+                  : "1fr",
+              gap: 14,
+            }}
+          >
+            {filteredSongs.map(renderSong)}
+          </div>
+        ) : (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "42px 20px",
+              border: `1px dashed ${theme.border}`,
+              borderRadius: theme.radiusLg,
+              color: theme.textMuted,
+            }}
+          >
+            <Music
+              size={34}
+              style={{ marginBottom: 12, opacity: 0.7 }}
+            />
+
+            <p
               style={{
-                display: "flex", alignItems: "center", gap: 14,
-                padding: "8px 10px", borderRadius: 8,
-                textDecoration: "none", color: "inherit",
+                margin: "0 0 8px",
+                color: theme.text,
+                fontWeight: 700,
               }}
             >
-              <img
-                src={fileUrl(s.coverArtField)}
-                alt={s.title}
-                style={{ width: 56, height: 56, borderRadius: 6, objectFit: "cover", flexShrink: 0, background: theme.bgRaised, border: `1px solid ${theme.border}` }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-                <div style={{ fontSize: 12.5, opacity: 0.6, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {s.artistName}{s.genre ? ` · ${s.genre}` : ""}
-                </div>
-              </div>
-              {s.releaseType && (
-                <div style={{ fontSize: 11, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 }}>
-                  {s.releaseType}
-                </div>
-              )}
-            </Link>
-          ))}
-        </div>
-      )}
+              No music found
+            </p>
 
-      {/* Compact view */}
-      {view === "compact" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {filtered.map((s, i) => (
-            <Link
-              key={s.$id}
-              to={`/song/${s.$id}`}
-              onClick={(e) => { e.preventDefault(); onPlaySong(filtered, i); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "11px 8px",
-                borderBottom: `1px solid ${theme.border}`,
-                textDecoration: "none", color: "inherit",
-              }}
-            >
-              <div style={{ width: 24, fontSize: 12, opacity: 0.4, textAlign: "right", flexShrink: 0 }}>{i + 1}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
-              </div>
-              <div style={{ fontSize: 12.5, opacity: 0.55, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "35%" }}>
-                {s.artistName}
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+            <p style={{ margin: 0, fontSize: 13 }}>
+              {songs.length === 0
+                ? "Your music catalogue will appear here when tracks are loaded."
+                : "Try another search or change your filters."}
+            </p>
 
-function Section({ title, children }) {
-  return (
-    <div style={{ marginBottom: 26 }}>
-      <div style={{ fontSize: 12, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, marginBottom: 12 }}>
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function MoodCard({ label, emoji, bg, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        flexShrink: 0,
-        position: "relative",
-        width: 160, height: 90,
-        padding: 0,
-        background: bg,
-        border: active ? "2px solid #fff" : "2px solid transparent",
-        borderRadius: 12,
-        cursor: "pointer",
-        overflow: "hidden",
-        boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
-        textAlign: "left",
-      }}
-    >
-      <div style={{ position: "absolute", top: 12, left: 14, fontSize: 24 }}>{emoji}</div>
-      <div style={{ position: "absolute", bottom: 12, left: 14, right: 14, fontSize: 14, fontWeight: 700, color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,0.4)" }}>
-        {label}
-      </div>
-    </button>
-  );
-}
-
-function GenreCard({ label, count, bg, emoji, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        position: "relative",
-        aspectRatio: "1.15",
-        padding: 0,
-        background: bg,
-        border: active ? "2px solid #fff" : "2px solid transparent",
-        borderRadius: 10,
-        cursor: "pointer",
-        overflow: "hidden",
-        boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
-        textAlign: "left",
-        minHeight: 110,
-      }}
-    >
-      <div style={{ position: "absolute", top: 10, right: 12, fontSize: 26, opacity: 0.85 }}>{emoji}</div>
-      <div style={{ position: "absolute", bottom: 10, left: 12, right: 12 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.5)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {label}
-        </div>
-        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 2 }}>
-          {count} {count === 1 ? "song" : "songs"}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function ViewBtn({ icon: Icon, active, onClick, title }) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      style={{
-        background: active ? theme.accent : "transparent",
-        border: "none",
-        color: active ? "#fff" : theme.text,
-        opacity: active ? 1 : 0.7,
-        width: 32, height: 32,
-        borderRadius: 6,
-        cursor: "pointer",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}
-    >
-      <Icon size={16} />
-    </button>
+            {(search ||
+              category !== "All" ||
+              selectedMood !== "All" ||
+              selectedGenre !== "All") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setCategory("All");
+                  setSelectedMood("All");
+                  setSelectedGenre("All");
+                }}
+                style={{
+                  marginTop: 18,
+                  padding: "10px 18px",
+                  border: 0,
+                  borderRadius: theme.radiusPill,
+                  background: theme.accentGrad,
+                  color: theme.accentFg,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
+      </section>
+    </main>
   );
 }

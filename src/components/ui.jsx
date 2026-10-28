@@ -1,139 +1,238 @@
-import React from "react";
+// src/components/ui.js
 
-const DARK = {
-  bg: "#0b0b0d",
-  bgRaised: "#151517",
-  border: "#26262a",
-  text: "#f2f2f2",
-  textDim: "rgba(242,242,242,0.6)",
-  accent: "#7c5cff",
-  danger: "#ff6b6b",
-  // Shell
-  shellBg: "#0b0b0d",
-  navBg: "#0b0b0d",
-  navBorder: "#26262a",
-  // Player
-  playerBg: "linear-gradient(180deg, #17171d 0%, #0b0b0d 70%)",
-  bubble: "#151517",
-  bubbleMine: "#7c5cff",
-  bubbleMineText: "#ffffff",
-  progressBg: "rgba(255,255,255,0.12)",
+const STORAGE_MODE = "naomi-theme";
+const STORAGE_PALETTE = "naomi-music-palette";
+
+export const theme = {
+  bg: "var(--bg)",
+  bgRaised: "var(--bg-raised)",
+  bgAlt: "var(--bg-alt)",
+  surface: "var(--surface)",
+  card: "var(--card)",
+  cardHover: "var(--card-hover)",
+  overlay: "var(--overlay)",
+
+  text: "var(--text)",
+  textMuted: "var(--text-muted)",
+  textDim: "var(--text-dim)",
+  textInverse: "var(--text-inverse)",
+
+  border: "var(--border)",
+  borderStrong: "var(--border-strong)",
+  divider: "var(--divider)",
+
+  accent: "var(--accent)",
+  accent2: "var(--accent-2)",
+  accentHover: "var(--accent-hover)",
+  accentFg: "var(--accent-fg)",
+  accentGrad: "var(--accent-grad)",
+  accentSoft: "var(--accent-soft)",
+
+  success: "var(--success)",
+  warning: "var(--warning)",
+  danger: "var(--danger)",
+  info: "var(--info)",
+
+  shadowSm: "var(--shadow-sm)",
+  shadowMd: "var(--shadow-md)",
+  shadowLg: "var(--shadow-lg)",
+  shadowGlow: "var(--shadow-glow)",
+
+  radiusSm: "10px",
+  radiusMd: "16px",
+  radiusLg: "22px",
+  radiusXl: "28px",
+  radiusPill: "999px",
+
+  fontBody: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  fontDisplay: 'Georgia, "Iowan Old Style", "Times New Roman", serif',
 };
 
-const LIGHT = {
-  bg: "#f5f5f7",
-  bgRaised: "#ffffff",
-  border: "#e1e1e6",
-  text: "#0b0b0d",
-  textDim: "rgba(11,11,13,0.6)",
-  accent: "#6d4aff",
-  danger: "#e03b3b",
-  shellBg: "#f5f5f7",
-  navBg: "#ffffff",
-  navBorder: "#e1e1e6",
-  playerBg: "linear-gradient(180deg, #ffffff 0%, #f5f5f7 70%)",
-  bubble: "#ffffff",
-  bubbleMine: "#6d4aff",
-  bubbleMineText: "#ffffff",
-  progressBg: "rgba(0,0,0,0.10)",
-};
+const validModes = ["auto", "light", "dark"];
 
-let currentMode = "auto";        // "light" | "dark" | "auto"
-let systemPrefersDark = true;    // updated by listener
+const validPalettes = [
+  "purple",
+  "blue",
+  "sunset",
+  "green",
+  "rose",
+  "gold",
+];
 
-function resolved() {
-  if (currentMode === "auto") return systemPrefersDark ? DARK : LIGHT;
-  return currentMode === "dark" ? DARK : LIGHT;
+function getSaved(key, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    return value || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
-// Reactive accessor — every `theme.x` reads the live value
-export const theme = new Proxy({}, {
-  get(_, key) {
-    return resolved()[key];
-  },
-});
-
-export function getThemeMode() {
-  return currentMode;
+function save(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // The theme still works if storage is unavailable.
+  }
 }
 
-export function setThemeMode(mode) {
-  currentMode = mode;
-  try { localStorage.setItem("naomi_theme_mode", mode); } catch {}
-  applyDocumentTheme();
+function getSystemTheme() {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function"
+  ) {
+    return window.matchMedia("(prefers-color-scheme: light)").matches
+      ? "light"
+      : "dark";
+  }
+
+  return "dark";
+}
+
+function applyMode(mode) {
+  if (typeof document === "undefined") return "dark";
+
+  const selectedMode = validModes.includes(mode) ? mode : "dark";
+  const resolvedMode =
+    selectedMode === "auto" ? getSystemTheme() : selectedMode;
+
+  const root = document.documentElement;
+
+  // CSS uses data-theme="dark" or data-theme="light".
+  root.dataset.theme = resolvedMode;
+
+  // Preserve the selected preference separately.
+  root.dataset.themeMode = selectedMode;
+
+  return resolvedMode;
+}
+
+function applyPalette(palette) {
+  if (typeof document === "undefined") return "purple";
+
+  const selectedPalette = validPalettes.includes(palette)
+    ? palette
+    : "purple";
+
+  // CSS palette selectors should use [data-palette="..."].
+  document.documentElement.dataset.palette = selectedPalette;
+
+  return selectedPalette;
 }
 
 export function initTheme() {
-  try {
-    const saved = localStorage.getItem("naomi_theme_mode");
-    if (saved === "light" || saved === "dark" || saved === "auto") {
-      currentMode = saved;
-    }
-  } catch {}
+  if (typeof document === "undefined") return;
 
-  // Watch system preference
+  let mode = getSaved(STORAGE_MODE, "dark");
+  let palette = getSaved(STORAGE_PALETTE, "purple");
+
+  if (!validModes.includes(mode)) mode = "dark";
+  if (!validPalettes.includes(palette)) palette = "purple";
+
+  applyMode(mode);
+  applyPalette(palette);
+
+  // Avoid registering multiple system listeners.
   if (typeof window !== "undefined" && window.matchMedia) {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    systemPrefersDark = mq.matches;
-    mq.addEventListener("change", (e) => {
-      systemPrefersDark = e.matches;
-      applyDocumentTheme();
-      window.dispatchEvent(new Event("naomi-theme-change"));
-    });
+    if (!window.__naomiThemeListenerRegistered) {
+      const media = window.matchMedia(
+        "(prefers-color-scheme: light)"
+      );
+
+      const handleSystemChange = () => {
+        if (getThemeMode() === "auto") {
+          applyMode("auto");
+          window.dispatchEvent(
+            new Event("naomi-theme-change")
+          );
+        }
+      };
+
+      if (media.addEventListener) {
+        media.addEventListener("change", handleSystemChange);
+      } else if (media.addListener) {
+        media.addListener(handleSystemChange);
+      }
+
+      window.__naomiThemeListenerRegistered = true;
+    }
   }
 
-  applyDocumentTheme();
+  window.dispatchEvent(new Event("naomi-theme-change"));
+  window.dispatchEvent(new Event("naomi-palette-change"));
 }
 
-function applyDocumentTheme() {
+export function setTheme(mode) {
   if (typeof document === "undefined") return;
-  const t = resolved();
-  document.documentElement.style.background = t.bg;
-  document.body.style.background = t.bg;
-  document.body.style.color = t.text;
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", t.bg);
+
+  const selectedMode = validModes.includes(mode) ? mode : "dark";
+
+  save(STORAGE_MODE, selectedMode);
+  applyMode(selectedMode);
+
+  window.dispatchEvent(new Event("naomi-theme-change"));
 }
 
-export function inputStyle() {
-  return {
-    width: "100%",
-    background: theme.bgRaised,
-    border: `1px solid ${theme.border}`,
-    borderRadius: 4,
-    color: theme.text,
-    padding: "10px 12px",
-    fontSize: 14,
-    fontFamily: "inherit",
-    outline: "none",
-    boxSizing: "border-box",
-  };
+export function setThemeMode(mode) {
+  setTheme(mode);
 }
 
-export function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom: 14 }}>
-      {label && <div style={{ fontSize: 12.5, opacity: 0.75, marginBottom: 6 }}>{label}</div>}
-      {children}
-    </div>
-  );
+export function getThemeMode() {
+  const mode = getSaved(STORAGE_MODE, "dark");
+  return validModes.includes(mode) ? mode : "dark";
 }
 
-export function Button({ children, onClick, disabled, style, variant, type = "button" }) {
-  const isOutline = variant === "outline";
+export function currentTheme() {
+  if (typeof document === "undefined") return "dark";
+
+  return document.documentElement.dataset.theme || "dark";
+}
+
+export function toggleTheme() {
+  const current = currentTheme();
+
+  // Toggle the visible appearance, regardless of Auto mode.
+  setTheme(current === "dark" ? "light" : "dark");
+}
+
+export function getThemePalette() {
+  const palette = getSaved(STORAGE_PALETTE, "purple");
+
+  return validPalettes.includes(palette) ? palette : "purple";
+}
+
+export function setThemePalette(palette) {
+  if (typeof document === "undefined") return;
+
+  const selectedPalette = validPalettes.includes(palette)
+    ? palette
+    : "purple";
+
+  save(STORAGE_PALETTE, selectedPalette);
+  applyPalette(selectedPalette);
+
+  window.dispatchEvent(new Event("naomi-palette-change"));
+}
+
+export function Button({
+  children,
+  onClick,
+  disabled = false,
+  style = {},
+  type = "button",
+}) {
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
       style={{
-        background: isOutline ? "transparent" : theme.accent,
-        color: isOutline ? theme.accent : "#fff",
-        border: `1px solid ${theme.accent}`,
-        borderRadius: 4,
-        padding: "10px 18px",
-        fontSize: 13.5,
-        fontWeight: 600,
+        padding: "12px 18px",
+        border: "none",
+        borderRadius: "12px",
+        background: theme.accentGrad,
+        color: "#fff",
+        fontWeight: 700,
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.6 : 1,
         fontFamily: "inherit",
@@ -145,7 +244,54 @@ export function Button({ children, onClick, disabled, style, variant, type = "bu
   );
 }
 
+export function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <label
+        style={{
+          display: "block",
+          marginBottom: 7,
+          color: theme.text,
+          fontSize: 13,
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 export function ErrorNote({ message }) {
   if (!message) return null;
-  return <div style={{ color: theme.danger, fontSize: 12.5, marginTop: 6, marginBottom: 10 }}>{message}</div>;
+
+  return (
+    <div
+      role="alert"
+      style={{
+        color: theme.danger,
+        fontSize: 13,
+        margin: "12px 0",
+        overflowWrap: "anywhere",
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
+export function inputStyle() {
+  return {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "12px",
+    border: `1px solid ${theme.border}`,
+    borderRadius: "10px",
+    background: theme.surface,
+    color: theme.text,
+    fontSize: "14px",
+    fontFamily: "inherit",
+    outline: "none",
+  };
 }

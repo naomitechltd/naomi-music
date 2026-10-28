@@ -1,231 +1,192 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Home, UploadCloud, ListMusic, Library, ShieldCheck, User, LogOut, Menu, X, MessageSquare, Radio, TrendingUp, Mic2 } from "lucide-react";
+
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { theme } from "./ui";
-import { fileUrl } from "../lib/appwrite";
 
-const LEGAL_ITEMS = [
-  { path: "/about", label: "About" },
-  { path: "/terms", label: "Terms of Use" },
-  { path: "/privacy", label: "Privacy Policy" },
-  { path: "/tscs", label: "T's and C's" },
-  { path: "/developer", label: "Developer" },
-];
-
-export function NavBar({ isArtist, isAdmin, currentUser, onLogout, onStartRadio }) {
+export function NavBar({ currentUser, onLogout }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [logoText, setLogoText] = useState("Naomi Music");
-  const [logoFading, setLogoFading] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const swap = async (next) => {
-      if (cancelled) return;
-      setLogoFading(true);
-      await sleep(220);
-      if (cancelled) return;
-      setLogoText(next);
-      setLogoFading(false);
-    };
-    (async () => {
-      while (!cancelled) {
-        await sleep(30000);
-        if (cancelled) return;
-        await swap("Home");
-        await sleep(10000);
-        if (cancelled) return;
-        await swap("Naomi Music");
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const initial =
+    currentUser?.name?.charAt(0)?.toUpperCase() || "J";
 
-  const items = [
-    { path: "/", label: "Home", icon: Home },
-    { path: "/playlists", label: "Playlists", icon: Library },
-    { path: "/messages", label: "Messages", icon: MessageSquare },
-    { path: "/trending", label: "Trending", icon: TrendingUp },
-    { path: "/artists", label: "Artists", icon: Mic2 },
-    ...(isArtist ? [{ path: "/upload", label: "Upload", icon: UploadCloud }] : []),
-    ...(isArtist ? [{ path: "/mysongs", label: "My Songs", icon: ListMusic }] : []),
-    ...(isAdmin ? [{ path: "/admin", label: "Admin", icon: ShieldCheck }] : []),
-    ...(isAdmin ? [{ path: "/admin/reports", label: "Reports", icon: ShieldCheck }] : []),
-    ...(isAdmin ? [{ path: "/admin/notices", label: "Notices", icon: ShieldCheck }] : []),
-    ...(isAdmin ? [{ path: "/admin/analytics", label: "Analytics", icon: ShieldCheck }] : []),
-  ];
-
-  const mobileNavItems = items.filter((it) => it.path !== "/");
-
-  const isActive = (path) => {
-    if (path === "/") return location.pathname === "/";
-    return location.pathname.startsWith(path);
-  };
-
-  const iconBtnStyle = (active) => ({
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    color: active ? theme.accent : theme.text,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 8,
-    borderRadius: 6,
-  });
-
-  const go = (path) => {
+  const goTo = (path) => {
+    setMenuOpen(false);
     navigate(path);
-    setMobileOpen(false);
-    setProfileOpen(false);
   };
 
   return (
-    <div style={{ position: "sticky", top: 0, zIndex: 100, background: theme.bg, borderBottom: `1px solid ${theme.border}` }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
-        <button onClick={() => go("/")} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, fontWeight: 700, fontSize: 16, padding: 0, fontFamily: "inherit", textAlign: "left" }}>
-          <span style={{ display: "inline-grid" }}>
-            <span
-              style={{
-                gridArea: "1 / 1",
-                opacity: logoFading ? 0 : 1,
-                transform: logoFading ? "translateY(-4px)" : "translateY(0)",
-                transition: "opacity 0.22s ease, transform 0.22s ease",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {logoText}
-            </span>
-            <span aria-hidden="true" style={{ gridArea: "1 / 1", visibility: "hidden", pointerEvents: "none", whiteSpace: "nowrap" }}>
-              Naomi Music
-            </span>
-          </span>
-        </button>
-
-        <div className="nm-desktop-nav" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          {items.map((it) => (
-            <button key={it.path} title={it.label} onClick={() => go(it.path)} style={iconBtnStyle(isActive(it.path))}>
-              <it.icon size={19} />
-            </button>
-          ))}
-
-          <button title="Radio" onClick={() => go("/radio")} style={{ ...iconBtnStyle(isActive("/radio")), color: theme.accent }}>
-            <Radio size={19} />
-          </button>
-
-          <div style={{ position: "relative", marginLeft: 6 }}>
-            <button title={currentUser.name} onClick={() => setProfileOpen((v) => !v)} style={{ ...iconBtnStyle(profileOpen), padding: 2 }}>
-              {currentUser.avatarFileId ? (
-                <img src={fileUrl(currentUser.avatarFileId)} alt={currentUser.name} style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", display: "block" }} />
-              ) : (
-                <User size={19} />
-              )}
-            </button>
-            {profileOpen && (
-              <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: theme.bgRaised, border: `1px solid ${theme.border}`, borderRadius: 6, padding: 12, width: 190, boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{currentUser.name}</div>
-                <div style={{ fontSize: 11.5, opacity: 0.6, marginBottom: 10, textTransform: "capitalize" }}>{currentUser.role}</div>
-                <button
-                  onClick={() => go("/profile")}
-                  style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: theme.text, cursor: "pointer", fontSize: 13, fontFamily: "inherit", padding: 0, marginBottom: 10 }}
-                >
-                  <User size={15} /> View profile
-                </button>
-                <button onClick={onLogout} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: theme.danger, cursor: "pointer", fontSize: 13, fontFamily: "inherit", padding: 0 }}>
-                  <LogOut size={15} /> Log out
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="nm-mobile-toggle" style={{ display: "none", alignItems: "center", gap: 8 }}>
-          <button onClick={() => go("/profile")} title="Profile" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex" }}>
-            {currentUser.avatarFileId ? (
-              <img src={fileUrl(currentUser.avatarFileId)} alt={currentUser.name} style={{ width: 30, height: 30, borderRadius: "50%", objectFit: "cover", border: `1px solid ${theme.border}` }} />
-            ) : (
-              <div style={{ width: 30, height: 30, borderRadius: "50%", background: theme.bgRaised, border: `1px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: theme.accent, fontWeight: 700, fontSize: 13 }}>
-                {currentUser.name?.[0]?.toUpperCase() || "?"}
-              </div>
-            )}
-          </button>
-          <button onClick={() => setMobileOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex" }}>
-            <Menu size={22} />
-          </button>
-        </div>
-      </div>
-
-      {mobileOpen && (
-        <div onClick={() => setMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 190 }} />
-      )}
-
-      <div
+    <header
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "12px 20px",
+        background: "color-mix(in oklab, var(--bg) 85%, transparent)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        borderBottom: `1px solid ${theme.border}`,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => goTo("/")}
+        aria-label="Naomi Music home"
         style={{
-          position: "fixed", top: 0, right: 0, bottom: 0, width: 270, maxWidth: "80vw", zIndex: 195,
-          background: theme.bgRaised, borderLeft: `1px solid ${theme.border}`, boxShadow: "-8px 0 24px rgba(0,0,0,0.4)",
-          transform: mobileOpen ? "translateX(0)" : "translateX(100%)", transition: "transform 0.28s ease",
-          display: "flex", flexDirection: "column", overflowY: "auto",
+          padding: 0,
+          border: 0,
+          background: "none",
+          color: theme.text,
+          cursor: "pointer",
+          fontFamily: theme.fontDisplay,
+          fontSize: 23,
+          fontWeight: 700,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "flex-end", padding: "14px 14px 0" }}>
-          <button onClick={() => setMobileOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text }}>
-            <X size={22} />
-          </button>
-        </div>
+        Naomi <span style={{ color: theme.accent }}>Music</span>
+      </button>
 
-        <div style={{ padding: "10px 20px", display: "flex", flexDirection: "column", gap: 2 }}>
-          <button
-            onClick={() => go("/radio")}
-            style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: isActive("/radio") ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          type="button"
+          onClick={() => goTo("/profile")}
+          aria-label="Open profile"
+          title="Profile"
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: "50%",
+            background: theme.accentGrad,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: theme.accentFg,
+            fontWeight: 700,
+            fontSize: 16,
+            cursor: "pointer",
+            boxShadow: theme.shadowGlow,
+            border: 0,
+          }}
+        >
+          {initial}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          style={{
+            background: "none",
+            border: 0,
+            color: theme.text,
+            cursor: "pointer",
+            padding: 8,
+          }}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
           >
-            <Radio size={18} /> Radio
-          </button>
-          <button
-            onClick={() => go("/profile")}
-            style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: isActive("/profile") ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
-          >
-            <User size={18} /> Profile
-          </button>
-          <div style={{ borderTop: `1px solid ${theme.border}`, margin: "6px 0" }} />
-          {mobileNavItems.map((it) => (
-            <button
-              key={it.path}
-              onClick={() => go(it.path)}
-              style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", color: isActive(it.path) ? theme.accent : theme.text, fontSize: 14, padding: "10px 4px", fontFamily: "inherit", textAlign: "left" }}
-            >
-              <it.icon size={18} /> {it.label}
-            </button>
-          ))}
-
-          {mobileNavItems.length > 0 && <div style={{ borderTop: `1px solid ${theme.border}`, margin: "8px 0" }} />}
-
-          {LEGAL_ITEMS.map((it) => (
-            <button
-              key={it.path}
-              onClick={() => go(it.path)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: isActive(it.path) ? theme.accent : theme.text, opacity: 0.85, fontSize: 13.5, padding: "9px 4px", fontFamily: "inherit", textAlign: "left" }}
-            >
-              {it.label}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ marginTop: "auto", padding: "16px 20px", borderTop: `1px solid ${theme.border}` }}>
-          <button onClick={onLogout} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: theme.danger, cursor: "pointer", fontSize: 14, fontFamily: "inherit", padding: 0 }}>
-            <LogOut size={16} /> Log out
-          </button>
-        </div>
+            {menuOpen ? (
+              <>
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </>
+            ) : (
+              <>
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </>
+            )}
+          </svg>
+        </button>
       </div>
 
-      <style>{`
-        @media (max-width: 640px) {
-          .nm-desktop-nav { display: none !important; }
-          .nm-mobile-toggle { display: flex !important; }
-        }
-      `}</style>
-    </div>
+      {menuOpen && (
+        <nav
+          aria-label="Main menu"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            right: 16,
+            width: 230,
+            padding: 8,
+            background: theme.surface,
+            border: `1px solid ${theme.border}`,
+            borderRadius: 16,
+            boxShadow: theme.shadowLg,
+            display: "grid",
+            gap: 4,
+          }}
+        >
+          {[
+            { label: "Home", path: "/" },
+            { label: "Trending", path: "/trending" },
+            { label: "Artists", path: "/artists" },
+            { label: "Playlists", path: "/playlists" },
+            { label: "Radio", path: "/radio" },
+            { label: "Messages", path: "/messages" },
+            { label: "My Profile", path: "/profile" },
+            { label: "🎨 Themes & Appearance", path: "/settings/theme" },
+          ].map((item) => (
+            <button
+              key={item.path}
+              type="button"
+              onClick={() => goTo(item.path)}
+              style={{
+                padding: "12px 14px",
+                width: "100%",
+                textAlign: "left",
+                border: 0,
+                borderRadius: 10,
+                background: "transparent",
+                color: theme.text,
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--accent-soft)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+
+          {onLogout && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                onLogout();
+              }}
+              style={{
+                padding: "12px 14px",
+                width: "100%",
+                textAlign: "left",
+                border: 0,
+                borderRadius: 10,
+                background: "transparent",
+                color: "var(--danger)",
+                cursor: "pointer",
+              }}
+            >
+              Log out
+            </button>
+          )}
+        </nav>
+      )}
+    </header>
   );
 }

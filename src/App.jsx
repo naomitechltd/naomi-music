@@ -1,8 +1,31 @@
+
 import React, { useState, useEffect } from "react";
-import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
-import { account, storage, ID, BUCKET_ID, Permission, Role, tablesDB, DATABASE_ID, SONGS_TABLE_ID, Query } from "./lib/appwrite";
+import {
+  Routes,
+  Route,
+  useNavigate,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
+
+import {
+  account,
+  storage,
+  ID,
+  BUCKET_ID,
+  Permission,
+  Role,
+  tablesDB,
+  DATABASE_ID,
+  SONGS_TABLE_ID,
+  Query,
+} from "./lib/appwrite";
+
+import ThemeSettings from "./components/ThemeSettings";
+
 import { fetchMyRole } from "./lib/role";
 import { setRole } from "./lib/api";
+
 import { AuthView } from "./pages/AuthView";
 import { UploadView } from "./pages/UploadView";
 import { MySongsView } from "./pages/MySongsView";
@@ -20,14 +43,23 @@ import { TrendingView } from "./pages/TrendingView";
 import { ArtistsDirectoryView } from "./pages/ArtistsDirectoryView";
 import { AdminAnalyticsView } from "./pages/AdminAnalyticsView";
 import { ArtistPage } from "./pages/ArtistPage";
-import { AboutPage, TermsPage, PrivacyPage, TsCsPage, DeveloperPage } from "./pages/StaticPages";
+
+import {
+  AboutPage,
+  TermsPage,
+  PrivacyPage,
+  TsCsPage,
+  DeveloperPage,
+} from "./pages/StaticPages";
+
 import { PlayerDock } from "./components/PlayerDock";
 import { NavBar } from "./components/NavBar";
 import { EmailVerifyBanner } from "./components/EmailVerifyBanner";
 import { CompleteProfileBanner } from "./components/CompleteProfileBanner";
 import { NoticeBanner } from "./components/NoticeBanner";
 import { SplashScreen } from "./components/SplashScreen";
-import { theme } from "./components/ui";
+
+import { theme, initTheme } from "./components/ui";
 
 export default function App() {
   const navigate = useNavigate();
@@ -35,93 +67,178 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState(null);
   const [ready, setReady] = useState(false);
+
   const [refreshKey, setRefreshKey] = useState(0);
+  const [browseSongs, setBrowseSongs] = useState([]);
+
   const [queue, setQueue] = useState([]);
   const [playerIndex, setPlayerIndex] = useState(null);
   const [playerExpanded, setPlayerExpanded] = useState(false);
+
   const [splashPhase, setSplashPhase] = useState("logo");
   const [splashDone, setSplashDone] = useState(false);
+
   const [openConversation, setOpenConversation] = useState(null);
   const [themeTick, setThemeTick] = useState(0);
 
-  const playSong = (songs, idx) => {
-    setQueue(songs);
-    setPlayerIndex(idx);
-    setPlayerExpanded(true);
-  };
-
-  const startRadio = async () => {
-    try {
-      const res = await tablesDB.listRows(DATABASE_ID, SONGS_TABLE_ID, [
-        Query.equal("status", "approved"),
-        Query.limit(200),
-      ]);
-      const all = (res.rows || []).slice();
-      if (all.length === 0) return;
-      for (let i = all.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [all[i], all[j]] = [all[j], all[i]];
-      }
-      setQueue(all);
-      setPlayerIndex(0);
-      setPlayerExpanded(true);
-    } catch (e) {
-      console.warn("radio failed:", e.message);
-    }
-  };
-
+  // Initialize saved theme and colour palette.
   useEffect(() => {
-    const h = () => setThemeTick((n) => n + 1);
-    window.addEventListener("naomi-theme-change", h);
-    return () => window.removeEventListener("naomi-theme-change", h);
+    initTheme();
   }, []);
 
+  // Rerender when the theme changes.
   useEffect(() => {
-    const t1 = setTimeout(() => setSplashPhase("slogan"), 1200);
-    const t2 = setTimeout(() => setSplashDone(true), 2200);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    const handleThemeChange = () => {
+      setThemeTick((value) => value + 1);
+    };
+
+    window.addEventListener(
+      "naomi-theme-change",
+      handleThemeChange
+    );
+
+    window.addEventListener(
+      "naomi-palette-change",
+      handleThemeChange
+    );
+
+    return () => {
+      window.removeEventListener(
+        "naomi-theme-change",
+        handleThemeChange
+      );
+
+      window.removeEventListener(
+        "naomi-palette-change",
+        handleThemeChange
+      );
+    };
   }, []);
 
+  // Splash screen animation.
+  useEffect(() => {
+    const firstTimer = setTimeout(
+      () => setSplashPhase("slogan"),
+      1200
+    );
+
+    const secondTimer = setTimeout(
+      () => setSplashDone(true),
+      2200
+    );
+
+    return () => {
+      clearTimeout(firstTimer);
+      clearTimeout(secondTimer);
+    };
+  }, []);
+
+  // Process email verification and password recovery links.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const uid = params.get("userId");
-    const secret = params.get("secret");
-    if (!uid || !secret) return;
 
-    (async () => {
+    const userId = params.get("userId");
+    const secret = params.get("secret");
+
+    if (!userId || !secret) return;
+
+    let cancelled = false;
+
+    async function processAccountLink() {
       try {
-        await account.updateVerification(uid, secret);
-        window.history.replaceState({}, "", window.location.pathname);
+        await account.updateVerification(userId, secret);
+
+        if (cancelled) return;
+
+        window.history.replaceState(
+          {},
+          "",
+          window.location.pathname
+        );
+
         alert("Email verified — you can now upload songs.");
-      } catch (errVerify) {
-        const p1 = window.prompt("Enter your new password (min 8 characters):");
-        if (!p1) {
-          window.history.replaceState({}, "", window.location.pathname);
+      } catch (verificationError) {
+        if (cancelled) return;
+
+        const newPassword = window.prompt(
+          "Enter your new password (minimum 8 characters):"
+        );
+
+        if (!newPassword) {
+          window.history.replaceState(
+            {},
+            "",
+            window.location.pathname
+          );
           return;
         }
-        if (p1.length < 8) {
+
+        if (newPassword.length < 8) {
           alert("Password must be at least 8 characters.");
-          window.history.replaceState({}, "", window.location.pathname);
+
+          window.history.replaceState(
+            {},
+            "",
+            window.location.pathname
+          );
+
           return;
         }
+
         try {
-          await account.updateRecovery(uid, secret, p1);
-          window.history.replaceState({}, "", window.location.pathname);
-          alert("Password updated — log in with your new password.");
-        } catch (errRecover) {
-          window.history.replaceState({}, "", window.location.pathname);
-          alert("Link could not be processed: " + errRecover.message);
+          await account.updateRecovery(
+            userId,
+            secret,
+            newPassword
+          );
+
+          if (cancelled) return;
+
+          window.history.replaceState(
+            {},
+            "",
+            window.location.pathname
+          );
+
+          alert(
+            "Password updated — log in with your new password."
+          );
+        } catch (recoveryError) {
+          if (cancelled) return;
+
+          window.history.replaceState(
+            {},
+            "",
+            window.location.pathname
+          );
+
+          alert(
+            "Link could not be processed: " +
+              recoveryError.message
+          );
         }
       }
-    })();
+    }
+
+    processAccountLink();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Restore the current session and profile.
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    async function restoreSession() {
       try {
         const user = await account.get();
         const role = await fetchMyRole();
         const prefs = await account.getPrefs();
+
+        if (cancelled) return;
+
         setCurrentUser({
           ...user,
           role,
@@ -138,59 +255,206 @@ export default function App() {
           website: prefs.website || "",
         });
       } catch {
-        setCurrentUser(null);
+        if (!cancelled) {
+          setCurrentUser(null);
+        }
       } finally {
-        setReady(true);
+        if (!cancelled) {
+          setReady(true);
+        }
       }
-    })();
+    }
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const handleAuth = async ({ mode, name, email, password, phone, location, studio, studioManager, role, avatarFile }) => {
-    if (mode === "signup") {
-      await account.create(ID.unique(), email, password, name);
-      await account.createEmailPasswordSession(email, password);
+  // Load approved music for BrowseView.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBrowseSongs() {
       try {
-        await account.createVerification(`${window.location.origin}/`);
-      } catch (err) {
-        console.warn("createVerification failed:", err.message);
+        const response = await tablesDB.listRows(
+          DATABASE_ID,
+          SONGS_TABLE_ID,
+          [
+            Query.equal("status", "approved"),
+            Query.limit(100),
+          ]
+        );
+
+        if (!cancelled) {
+          setBrowseSongs(response.rows || []);
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load songs for BrowseView:",
+          error
+        );
+
+        if (!cancelled) {
+          setBrowseSongs([]);
+        }
       }
+    }
+
+    loadBrowseSongs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  // Start playing a queue of songs.
+  const playSong = (songs, index) => {
+    if (!Array.isArray(songs) || songs.length === 0) return;
+
+    const safeIndex = Math.max(
+      0,
+      Math.min(index, songs.length - 1)
+    );
+
+    setQueue(songs);
+    setPlayerIndex(safeIndex);
+    setPlayerExpanded(true);
+  };
+
+  // Start a random radio queue.
+  const startRadio = async () => {
+    try {
+      const response = await tablesDB.listRows(
+        DATABASE_ID,
+        SONGS_TABLE_ID,
+        [
+          Query.equal("status", "approved"),
+          Query.limit(200),
+        ]
+      );
+
+      const songs = (response.rows || []).slice();
+
+      if (songs.length === 0) return;
+
+      for (let index = songs.length - 1; index > 0; index--) {
+        const randomIndex = Math.floor(
+          Math.random() * (index + 1)
+        );
+
+        [songs[index], songs[randomIndex]] = [
+          songs[randomIndex],
+          songs[index],
+        ];
+      }
+
+      playSong(songs, 0);
+    } catch (error) {
+      console.warn("Radio failed:", error.message);
+    }
+  };
+
+  // Signup and login.
+  const handleAuth = async ({
+    mode,
+    name,
+    email,
+    password,
+    phone,
+    location: profileLocation,
+    studio,
+    studioManager,
+    role,
+    avatarFile,
+  }) => {
+    if (mode === "signup") {
+      await account.create(
+        ID.unique(),
+        email,
+        password,
+        name
+      );
+
+      await account.createEmailPasswordSession(
+        email,
+        password
+      );
+
+      try {
+        await account.createVerification(
+          `${window.location.origin}/`
+        );
+      } catch (error) {
+        console.warn(
+          "Email verification request failed:",
+          error.message
+        );
+      }
+
       if (role === "artist") {
         await setRole("artist");
       }
+
       let avatarFileId = null;
+
       if (avatarFile) {
-        const me = await account.get();
+        const user = await account.get();
+
         const uploaded = await storage.createFile(
           BUCKET_ID,
           ID.unique(),
           avatarFile,
           [
             Permission.read(Role.users()),
-            Permission.update(Role.user(me.$id)),
-            Permission.delete(Role.user(me.$id)),
+            Permission.update(Role.user(user.$id)),
+            Permission.delete(Role.user(user.$id)),
           ]
         );
+
         avatarFileId = uploaded.$id;
       }
-      // Save profile fields to prefs
-      const prefsUpdate = {};
-      if (avatarFileId) prefsUpdate.avatarFileId = avatarFileId;
-      if (phone) prefsUpdate.phone = phone;
-      if (location) prefsUpdate.location = location;
-      if (studio) prefsUpdate.studio = studio;
-      if (studioManager) prefsUpdate.studioManager = studioManager;
-      if (Object.keys(prefsUpdate).length > 0) {
-        await account.updatePrefs(prefsUpdate);
+
+      const preferences = {};
+
+      if (avatarFileId) {
+        preferences.avatarFileId = avatarFileId;
+      }
+
+      if (phone) preferences.phone = phone;
+
+      if (profileLocation) {
+        preferences.location = profileLocation;
+      }
+
+      if (studio) preferences.studio = studio;
+
+      if (studioManager) {
+        preferences.studioManager = studioManager;
+      }
+
+      if (Object.keys(preferences).length > 0) {
+        await account.updatePrefs(preferences);
       }
     } else {
-      // Clear any stale session before login (Appwrite blocks a new session
-      // when one is already active in the same browser)
-      try { await account.deleteSession("current"); } catch {}
-      await account.createEmailPasswordSession(email, password);
+      // Clear any stale session before creating a new one.
+      try {
+        await account.deleteSession("current");
+      } catch {
+        // No existing session is fine.
+      }
+
+      await account.createEmailPasswordSession(
+        email,
+        password
+      );
     }
+
     const user = await account.get();
     const resolvedRole = await fetchMyRole();
     const prefs = await account.getPrefs();
+
     setCurrentUser({
       ...user,
       role: resolvedRole,
@@ -206,68 +470,270 @@ export default function App() {
       twitter: prefs.twitter || "",
       website: prefs.website || "",
     });
+
+    setRefreshKey((value) => value + 1);
   };
 
+  // Open a conversation from another page.
   const openChatFromAnywhere = (conversation) => {
     setOpenConversation(conversation);
     navigate("/messages");
   };
 
+  // Logout.
   const handleLogout = async () => {
-    track("logout");
-    await account.deleteSession("current");
+    try {
+      await account.deleteSession("current");
+    } catch (error) {
+      console.warn("Logout session cleanup failed:", error);
+    }
+
     setOpenConversation(null);
     setCurrentUser(null);
+    setQueue([]);
+    setPlayerIndex(null);
+    setPlayerExpanded(false);
+
     navigate("/");
   };
 
+  // Display splash screen while restoring the app.
   if (!ready || !splashDone) {
     return <SplashScreen phase={splashPhase} />;
   }
 
-  const isArtist = currentUser?.role === "artist" || currentUser?.role === "poet" || currentUser?.role === "admin";
+  const isArtist =
+    currentUser?.role === "artist" ||
+    currentUser?.role === "poet" ||
+    currentUser?.role === "admin";
+
   const isAdmin = currentUser?.role === "admin";
 
-  const requireAuth = (element) => currentUser ? element : <AuthView onAuth={handleAuth} />;
+  const requireAuth = (element) =>
+    currentUser ? element : <AuthView onAuth={handleAuth} />;
+
+  // Play a selected BrowseView song using the full loaded queue.
+  const handleBrowsePlay = (song) => {
+    const songId = song?.$id ?? song?.id;
+
+    const index = browseSongs.findIndex(
+      (item) => (item?.$id ?? item?.id) === songId
+    );
+
+    if (index !== -1) {
+      playSong(browseSongs, index);
+    }
+  };
 
   return (
-    <div style={{ minHeight: "100vh", background: theme.bg, color: theme.text, fontFamily: "system-ui, sans-serif" }}>
+    <div
+      key={themeTick}
+      style={{
+        minHeight: "100vh",
+        background: theme.bg,
+        color: theme.text,
+        fontFamily: theme.fontBody,
+        transition: "background 180ms ease, color 180ms ease",
+      }}
+    >
       {currentUser && (
-        <NavBar isArtist={isArtist} isAdmin={isAdmin} currentUser={currentUser} onLogout={handleLogout} onStartRadio={startRadio} />
+        <NavBar
+          isArtist={isArtist}
+          isAdmin={isAdmin}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onStartRadio={startRadio}
+        />
       )}
-      {currentUser && <EmailVerifyBanner currentUser={currentUser} />}
-      {currentUser && <CompleteProfileBanner currentUser={currentUser} />}
-      {currentUser && <NoticeBanner currentUser={currentUser} />}
+
+      {currentUser && (
+        <EmailVerifyBanner currentUser={currentUser} />
+      )}
+
+      {currentUser && (
+        <CompleteProfileBanner currentUser={currentUser} />
+      )}
+
+      {currentUser && (
+        <NoticeBanner currentUser={currentUser} />
+      )}
 
       <Routes>
-        <Route path="/" element={requireAuth(<BrowseView currentUser={currentUser} onPlaySong={playSong} />)} />
-        <Route path="/playlists" element={requireAuth(<PlaylistsView currentUser={currentUser} onPlaySong={playSong} />)} />
-        <Route path="/upload" element={requireAuth(isArtist ? <UploadView currentUser={currentUser} onUploaded={() => { setRefreshKey((k) => k + 1); navigate("/mysongs"); }} /> : <Navigate to="/" />)} />
-        <Route path="/mysongs" element={requireAuth(isArtist ? <MySongsView currentUser={currentUser} refreshKey={refreshKey} /> : <Navigate to="/" />)} />
-        <Route path="/admin" element={requireAuth(isAdmin ? <AdminQueueView /> : <Navigate to="/" />)} />
-        <Route path="/admin/reports" element={requireAuth(isAdmin ? <AdminReportsView /> : <Navigate to="/" />)} />
-        <Route path="/admin/notices" element={requireAuth(isAdmin ? <AdminNoticeView /> : <Navigate to="/" />)} />
-        <Route path="/admin/analytics" element={requireAuth(isAdmin ? <AdminAnalyticsView /> : <Navigate to="/" />)} />
-        <Route path="/messages" element={requireAuth(
-          openConversation
-            ? <ChatView conversation={openConversation} currentUser={currentUser} onBack={() => setOpenConversation(null)} />
-            : <MessagesView currentUser={currentUser} onOpenChat={openChatFromAnywhere} />
-        )} />
-        <Route path="/profile" element={requireAuth(<ProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} onLogout={handleLogout} />)} />
-        <Route path="/radio" element={requireAuth(<RadioView />)} />
-        <Route path="/trending" element={requireAuth(<TrendingView onPlaySong={playSong} />)} />
-        <Route path="/artists" element={requireAuth(<ArtistsDirectoryView />)} />
-        <Route path="/song/:id" element={<SongPage currentUser={currentUser} onPlaySong={playSong} onPlay={playSong} />} />
-        <Route path="/artist/:id" element={<ArtistPage currentUser={currentUser} onPlaySong={playSong} onOpenChat={openChatFromAnywhere} />} />
+        <Route
+          path="/"
+          element={requireAuth(
+            <BrowseView
+              currentUser={currentUser}
+              songs={browseSongs}
+              onPlaySong={handleBrowsePlay}
+            />
+          )}
+        />
+
+        <Route
+          path="/playlists"
+          element={requireAuth(
+            <PlaylistsView
+              currentUser={currentUser}
+              onPlaySong={playSong}
+            />
+          )}
+        />
+
+        <Route
+          path="/upload"
+          element={requireAuth(
+            isArtist ? (
+              <UploadView
+                currentUser={currentUser}
+                onUploaded={() => {
+                  setRefreshKey((value) => value + 1);
+                  navigate("/mysongs");
+                }}
+              />
+            ) : (
+              <Navigate to="/" />
+            )
+          )}
+        />
+
+        <Route
+          path="/mysongs"
+          element={requireAuth(
+            isArtist ? (
+              <MySongsView
+                currentUser={currentUser}
+                refreshKey={refreshKey}
+              />
+            ) : (
+              <Navigate to="/" />
+            )
+          )}
+        />
+
+        <Route
+          path="/admin"
+          element={requireAuth(
+            isAdmin ? <AdminQueueView /> : <Navigate to="/" />
+          )}
+        />
+
+        <Route
+          path="/admin/reports"
+          element={requireAuth(
+            isAdmin ? (
+              <AdminReportsView />
+            ) : (
+              <Navigate to="/" />
+            )
+          )}
+        />
+
+        <Route
+          path="/admin/notices"
+          element={requireAuth(
+            isAdmin ? (
+              <AdminNoticeView />
+            ) : (
+              <Navigate to="/" />
+            )
+          )}
+        />
+
+        <Route
+          path="/admin/analytics"
+          element={requireAuth(
+            isAdmin ? (
+              <AdminAnalyticsView />
+            ) : (
+              <Navigate to="/" />
+            )
+          )}
+        />
+
+        <Route
+          path="/messages"
+          element={requireAuth(
+            openConversation ? (
+              <ChatView
+                conversation={openConversation}
+                currentUser={currentUser}
+                onBack={() => setOpenConversation(null)}
+              />
+            ) : (
+              <MessagesView
+                currentUser={currentUser}
+                onOpenChat={openChatFromAnywhere}
+              />
+            )
+          )}
+        />
+
+        <Route
+          path="/profile"
+          element={requireAuth(
+            <ProfileView
+              currentUser={currentUser}
+              setCurrentUser={setCurrentUser}
+              onLogout={handleLogout}
+            />
+          )}
+        />
+
+        <Route
+          path="/radio"
+          element={requireAuth(<RadioView />)}
+        />
+
+        <Route
+          path="/trending"
+          element={requireAuth(
+            <TrendingView onPlaySong={playSong} />
+          )}
+        />
+
+        <Route
+          path="/artists"
+          element={requireAuth(<ArtistsDirectoryView />)}
+        />
+
+<Route
+  path="/settings/theme"
+  element={requireAuth(<ThemeSettings />)}
+/>
+
+        <Route
+          path="/song/:id"
+          element={
+            <SongPage
+              currentUser={currentUser}
+              onPlaySong={playSong}
+              onPlay={playSong}
+            />
+          }
+        />
+
+        <Route
+          path="/artist/:id"
+          element={
+            <ArtistPage
+              currentUser={currentUser}
+              onPlaySong={playSong}
+              onOpenChat={openChatFromAnywhere}
+            />
+          }
+        />
+
         <Route path="/about" element={<AboutPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/tscs" element={<TsCsPage />} />
         <Route path="/developer" element={<DeveloperPage />} />
+
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
 
-      {currentUser && playerIndex != null && (
+      {currentUser && playerIndex !== null && (
         <PlayerDock
           queue={queue}
           index={playerIndex}
@@ -275,7 +741,10 @@ export default function App() {
           expanded={playerExpanded}
           setExpanded={setPlayerExpanded}
           currentUser={currentUser}
-          onClose={() => setPlayerIndex(null)}
+          onClose={() => {
+            setPlayerIndex(null);
+            setPlayerExpanded(false);
+          }}
           onOpenChat={openChatFromAnywhere}
         />
       )}
