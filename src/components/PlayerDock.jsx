@@ -1,572 +1,360 @@
-import React, { useRef, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Play, Pause, SkipBack, SkipForward, Repeat, Repeat1, Heart, ChevronDown, X, ListPlus, Plus, Info, Share2, MessageSquare, MoreVertical } from "lucide-react";
-import { tablesDB, DATABASE_ID, LIKES_TABLE_ID, PLAYLISTS_TABLE_ID, PLAYLIST_SONGS_TABLE_ID, Query, ID, fileUrl } from "../lib/appwrite";
-import { theme, inputStyle } from "./ui";
-import { openConversation, incrementPlay } from "../lib/api";
-import { addRecentlyPlayed } from "../lib/recent";
-import { ReportModal } from "./ReportModal";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  ChevronDown, Heart, MoreVertical, Play, Pause,
+  SkipBack, SkipForward, SlidersHorizontal, ListMusic,
+  MessageSquare
+} from "lucide-react";
+import { fileUrl } from "../lib/appwrite";
 
-function formatTime(sec) {
-  if (!isFinite(sec) || sec < 0) return "0:00";
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-export function PlayerDock({ queue, index, setIndex, expanded, setExpanded, currentUser, onClose, onOpenChat }) {
-  const navigate = useNavigate();
+export function PlayerDock({
+  queue = [],
+  index = 0,
+  setIndex,
+  expanded,
+  setExpanded,
+  currentUser,
+  onClose,
+  onOpenChat
+}) {
+  const song = queue[index] || {};
   const audioRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
-  const [current, setCurrent] = useState(0);
+  const pagerRef = useRef(null);
+  const seekingRef = useRef(false);
+
+  const [activeSlide, setActiveSlide] = useState(1);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [repeat, setRepeat] = useState("off");
+  const [audioError, setAudioError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [liked, setLiked] = useState(false);
-  const [likeRowId, setLikeRowId] = useState(null);
-  const [likeCount, setLikeCount] = useState(0);
-  const [likeBusy, setLikeBusy] = useState(false);
 
-  const [showMenu, setShowMenu] = useState(false);
-  const [showAddMenu, setShowAddMenu] = useState(false);
-  const [myPlaylists, setMyPlaylists] = useState([]);
-  const [newPlaylistName, setNewPlaylistName] = useState("");
-  const [addBusy, setAddBusy] = useState(false);
-  const [addedMsg, setAddedMsg] = useState("");
-  const [showLyrics, setShowLyrics] = useState(false);
-  const [showAbout, setShowAbout] = useState(false);
-  const [showReport, setShowReport] = useState(false);
-  const [msgBusy, setMsgBusy] = useState(false);
-  const [msgNote, setMsgNote] = useState("");
+  const audioId = song.audioField || song.audioFileId || "";
+  const audioUrl = audioId ? fileUrl(audioId) : "";
+  const coverId = song.coverFileId || song.coverArtField || "";
+  const coverUrl = coverId ? fileUrl(coverId) : "/icon-512.svg";
 
-  const song = index != null ? queue[index] : null;
+  const formatTime = (seconds) => {
+    if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+    return `${Math.floor(seconds / 60)}:${String(
+      Math.floor(seconds % 60)
+    ).padStart(2, "0")}`;
+  };
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onTime = () => setCurrent(audio.currentTime);
-    const onMeta = () => setDuration(audio.duration || 0);
-    const onEnd = () => {
-      if (repeat === "one") { audio.currentTime = 0; audio.play(); return; }
+
+    audio.pause();
+    audio.currentTime = 0;
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+    setAudioError("");
+
+    if (!audioUrl) {
+      setAudioError("No audio file is attached to this song.");
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    audio.load();
+
+    const handleLoaded = () => {
+      setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+      setIsLoading(false);
+      setAudioError("");
+    };
+
+    const handleTime = () => {
+      if (!seekingRef.current) setCurrentTime(audio.currentTime || 0);
+    };
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+      setIsLoading(false);
+    };
+
+    const handlePause = () => setIsPlaying(false);
+
+    const handleError = () => {
+      setIsLoading(false);
+      setIsPlaying(false);
+      setAudioError("Audio could not load. Check the file permissions and connection.");
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
       if (index < queue.length - 1) setIndex(index + 1);
-      else if (repeat === "all") setIndex(0);
-      else setPlaying(false);
     };
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("loadedmetadata", onMeta);
-    audio.addEventListener("ended", onEnd);
+
+    audio.addEventListener("loadedmetadata", handleLoaded);
+    audio.addEventListener("durationchange", handleLoaded);
+    audio.addEventListener("timeupdate", handleTime);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("ended", handleEnded);
+
     return () => {
-      audio.removeEventListener("timeupdate", onTime);
-      audio.removeEventListener("loadedmetadata", onMeta);
-      audio.removeEventListener("ended", onEnd);
+      audio.removeEventListener("loadedmetadata", handleLoaded);
+      audio.removeEventListener("durationchange", handleLoaded);
+      audio.removeEventListener("timeupdate", handleTime);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("ended", handleEnded);
     };
-  }, [repeat, index, queue.length, setIndex]);
+  }, [audioUrl, index, queue.length, setIndex]);
 
   useEffect(() => {
-    if (!song || !audioRef.current) return;
-    audioRef.current.play().then(() => setPlaying(true)).catch(() => {});
-    // Count the play (server rate-limits to 1 per 30s per user per song)
-    incrementPlay(song.$id).catch(() => {});
-    addRecentlyPlayed(song);
-    setShowAddMenu(false);
-    setAddedMsg("");
-    setShowMenu(false);
-    setShowLyrics(false);
-    setShowAbout(false);
-  }, [song?.$id]);
+    if (expanded && pagerRef.current) {
+      const width = pagerRef.current.offsetWidth;
+      pagerRef.current.scrollTo({ left: width, behavior: "auto" });
+      setActiveSlide(1);
+    }
+  }, [expanded]);
 
-  useEffect(() => {
-    if (!song) return;
-    let cancelled = false;
-    tablesDB
-      .listRows(DATABASE_ID, LIKES_TABLE_ID, [Query.equal("songId", song.$id)])
-      .then((res) => {
-        if (cancelled) return;
-        setLikeCount(res.total);
-        const mine = res.rows.find((r) => r.userEmail === currentUser.email);
-        setLiked(!!mine);
-        setLikeRowId(mine ? mine.$id : null);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [song?.$id, currentUser.email]);
-
-  if (!song) return null;
-
-  const toggle = () => {
+  const togglePlayback = async () => {
     const audio = audioRef.current;
-    if (playing) { audio.pause(); setPlaying(false); }
-    else { audio.play(); setPlaying(true); }
-  };
+    if (!audio || !audioUrl) {
+      setAudioError("This song has no playable audio file.");
+      return;
+    }
 
-  const seek = (e) => {
-    const audio = audioRef.current;
-    if (!audio || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    audio.currentTime = ratio * duration;
-  };
+    if (!audio.paused) {
+      audio.pause();
+      return;
+    }
 
-  const prevTrack = () => {
-    const audio = audioRef.current;
-    if (audio && audio.currentTime > 3) audio.currentTime = 0;
-    else if (index > 0) setIndex(index - 1);
-    else if (audio) audio.currentTime = 0;
-  };
-
-  const nextTrack = () => {
-    if (index < queue.length - 1) setIndex(index + 1);
-    else if (repeat === "all") setIndex(0);
-  };
-
-  const cycleRepeat = () => setRepeat((r) => (r === "off" ? "all" : r === "all" ? "one" : "off"));
-
-  const toggleLike = async () => {
-    setLikeBusy(true);
     try {
-      if (liked && likeRowId) {
-        await tablesDB.deleteRow(DATABASE_ID, LIKES_TABLE_ID, likeRowId);
-        setLiked(false); setLikeRowId(null); setLikeCount((c) => c - 1);
-      } else {
-        const row = await tablesDB.createRow(DATABASE_ID, LIKES_TABLE_ID, ID.unique(), { userEmail: currentUser.email, songId: song.$id });
-        setLiked(true); setLikeRowId(row.$id); setLikeCount((c) => c + 1);
-      }
-    } catch {}
-    setLikeBusy(false);
-  };
-
-  const openAddMenu = async () => {
-    const next = !showAddMenu;
-    setShowAddMenu(next);
-    setShowMenu(false);
-    setAddedMsg("");
-    if (next) {
-      try {
-        const res = await tablesDB.listRows(DATABASE_ID, PLAYLISTS_TABLE_ID, [Query.equal("userEmail", currentUser.email)]);
-        setMyPlaylists(res.rows);
-      } catch (e) { setAddedMsg(e.message); }
+      setAudioError("");
+      setIsLoading(true);
+      await audio.play();
+    } catch (error) {
+      setIsLoading(false);
+      setAudioError(
+        error?.name === "NotAllowedError"
+          ? "Tap Play again to start audio."
+          : "Playback failed. Check your connection and the audio file."
+      );
     }
   };
 
-  const addToPlaylist = async (playlistId) => {
-    setAddBusy(true);
-    try {
-      await tablesDB.createRow(DATABASE_ID, PLAYLIST_SONGS_TABLE_ID, ID.unique(), {
-        playlistId, songId: song.$id, order: Date.now(),
-      });
-      setAddedMsg("Added.");
-    } catch (e) { setAddedMsg(e.message); }
-    finally { setAddBusy(false); }
+  const changeTrack = (nextIndex) => {
+    if (!queue.length || nextIndex < 0 || nextIndex >= queue.length) return;
+    setIndex(nextIndex);
   };
 
-  const createAndAdd = async () => {
-    if (!newPlaylistName.trim()) return;
-    setAddBusy(true);
-    try {
-      const pl = await tablesDB.createRow(DATABASE_ID, PLAYLISTS_TABLE_ID, ID.unique(), {
-        name: newPlaylistName.trim(),
-        userEmail: currentUser.email,
-      });
-      setMyPlaylists((p) => [...p, pl]);
-      setNewPlaylistName("");
-      await addToPlaylist(pl.$id);
-    } catch (e) { setAddedMsg(e.message); setAddBusy(false); }
+  const handleScroll = () => {
+    if (!pagerRef.current) return;
+    const width = pagerRef.current.offsetWidth;
+    if (!width) return;
+    setActiveSlide(Math.max(0, Math.min(2,
+      Math.round(pagerRef.current.scrollLeft / width)
+    )));
   };
 
-  const messageArtist = async () => {
-    if (msgBusy) return;
-    const artistUserId = song.uploadedByUserId;
-    if (!artistUserId) { setMsgNote("Artist not reachable."); return; }
-    if (artistUserId === currentUser.$id) { setMsgNote("This is your song."); return; }
-    setMsgBusy(true); setMsgNote("");
-    try {
-      const out = await openConversation(artistUserId);
-      if (out?.conversation && onOpenChat) {
-        onOpenChat(out.conversation);
-        setExpanded(false);
-        if (onClose) onClose();
-      } else if (out?.error === "email-not-verified") {
-        setMsgNote("Verify your email first.");
-      } else {
-        setMsgNote(out?.error || "Could not open chat.");
-      }
-    } catch (e) { setMsgNote(e.message); }
-    finally { setMsgBusy(false); setTimeout(() => setMsgNote(""), 3000); }
+  const goToSlide = (slide) => {
+    if (!pagerRef.current) return;
+    pagerRef.current.scrollTo({
+      left: slide * pagerRef.current.offsetWidth,
+      behavior: "smooth"
+    });
   };
 
-  const shareSong = async () => {
-    setShowMenu(false);
-    const url = `${window.location.origin}/song/${song.$id}`;
-    if (navigator.share) {
-      try { await navigator.share({ title: song.title, text: `${song.title} by ${song.artistName}`, url }); } catch {}
-    } else {
-      try { await navigator.clipboard.writeText(url); setMsgNote("Link copied"); setTimeout(() => setMsgNote(""), 2400); } catch {}
-    }
+  const seek = (event) => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+    const value = Number(event.target.value);
+    audio.currentTime = value;
+    setCurrentTime(value);
   };
-
-  const progress = duration ? (current / duration) * 100 : 0;
-  const RepeatIcon = repeat === "one" ? Repeat1 : Repeat;
 
   return (
-    <>
-      <audio ref={audioRef} src={song ? fileUrl(song.audioField) : ""} preload="metadata" />
+    <div id="fs-player" className={expanded ? "open" : ""}>
+      <audio
+        ref={audioRef}
+        src={audioUrl || undefined}
+        preload="metadata"
+        playsInline
+      />
 
-      {/* Mini bar */}
-      {!expanded && (
-        <div
-          onClick={() => setExpanded(true)}
-          style={{
-            position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 150,
-            background: theme.bgRaised, borderTop: `1px solid ${theme.border}`,
-            display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", cursor: "pointer",
-          }}
+      <div className="fs-header">
+        <button
+          className="fs-icon-btn"
+          onClick={() => setExpanded(!expanded)}
+          aria-label={expanded ? "Minimize player" : "Expand player"}
         >
-          <img src={fileUrl(song.coverArtField)} alt={song.title} style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song.title}</div>
-            <div style={{ fontSize: 11.5, opacity: 0.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song.artistName}</div>
-          </div>
-          <button onClick={(e) => { e.stopPropagation(); toggle(); }} style={{ background: "none", border: "none", color: theme.text, cursor: "pointer", display: "flex" }}>
-            {playing ? <Pause size={20} fill={theme.text} /> : <Play size={20} fill={theme.text} />}
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); nextTrack(); }} style={{ background: "none", border: "none", color: theme.text, cursor: "pointer", display: "flex" }}>
-            <SkipForward size={18} fill={theme.text} />
-          </button>
-          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: theme.border }}>
-            <div style={{ height: "100%", width: `${progress}%`, background: theme.accent }} />
+          <ChevronDown size={28} />
+        </button>
+
+        <div style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1.5,
+          textTransform: "uppercase",
+          color: "var(--mf)"
+        }}>
+          {isPlaying ? "Now Playing" : "Naomi Music"}
+        </div>
+
+        <button
+          className="fs-icon-btn"
+          onClick={() => onOpenChat?.(song)}
+          aria-label="Open chat"
+          title="Chat"
+        >
+          <MoreVertical size={24} />
+        </button>
+      </div>
+
+      <div className="fs-pager" ref={pagerRef} onScroll={handleScroll}>
+        <div className="fs-slide">
+          <div className="fs-slide-content">
+            <h2 className="fs-section-title">About the Artist</h2>
+            <h3 style={{ margin: "0 0 16px", fontSize: 24, color: "var(--fg)" }}>
+              {song.artistName || "Unknown Artist"}
+            </h3>
+            <p className="fs-artist-bio">
+              {song.artistBio ||
+                `${song.artistName || "This artist"} is an independent creator on Naomi Music.`}
+            </p>
           </div>
         </div>
-      )}
 
-      {/* Full player */}
-      {expanded && (
-        <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 200,
-            background: theme.playerBg,
-            display: "flex", flexDirection: "column",
-          }}
-        >
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px" }}>
-            <button onClick={() => setExpanded(false)} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex", padding: 4 }}>
-              <ChevronDown size={26} />
-            </button>
-            <div style={{ fontSize: 11, opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Now Playing
-            </div>
-            <button onClick={() => setShowMenu((v) => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, display: "flex", padding: 4 }}>
-              <MoreVertical size={22} />
-            </button>
-          </div>
-
-          {/* Menu dropdown */}
-          {showMenu && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                position: "absolute", top: 56, right: 16, zIndex: 250,
-                background: theme.bgRaised, border: `1px solid ${theme.border}`,
-                borderRadius: 10, padding: 6, minWidth: 190,
-                boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
-              }}
-            >
-              <MenuItem icon={Info} label="About song" onClick={() => { setShowMenu(false); setShowAbout(true); }} />
-              <MenuItem icon={MessageSquare} label="Message artist" onClick={messageArtist} />
-              <MenuItem icon={Share2} label="Share" onClick={shareSong} />
-              <MenuItem icon={ListPlus} label="Add to playlist" onClick={openAddMenu} />
-              <MenuItem icon={Info} label="Report song" onClick={() => { setShowMenu(false); setShowReport(true); }} />
-            </div>
-          )}
-
-          {/* Album art */}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 24px", minHeight: 0 }}>
+        <div className="fs-slide fs-main">
+          <div className="fs-cover-container">
             <img
-              src={fileUrl(song.coverArtField)}
-              alt={song.title}
-              style={{
-                width: "100%",
-                maxWidth: 360,
-                maxHeight: "100%",
-                aspectRatio: "1",
-                objectFit: "cover",
-                borderRadius: 14,
-                boxShadow: "0 24px 60px rgba(0,0,0,0.65)",
+              src={coverUrl}
+              alt={`${song.title || "Song"} cover`}
+              className="fs-cover"
+              onError={(event) => {
+                event.currentTarget.onerror = null;
+                event.currentTarget.src = "/icon-512.svg";
               }}
             />
           </div>
 
-          {/* Info + progress + controls */}
-          <div style={{ padding: "16px 24px 26px" }}>
-            {/* Title + artist + like */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 22, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {song.title}
-                </div>
-                <div style={{ fontSize: 14, opacity: 0.6, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {song.artistName}
-                </div>
-              </div>
-              <button
-                onClick={toggleLike}
-                disabled={likeBusy}
-                style={{ background: "none", border: "none", cursor: "pointer", color: liked ? "#ff4d6d" : theme.text, display: "flex", padding: 6 }}
-              >
-                <Heart size={24} fill={liked ? "#ff4d6d" : "none"} />
-              </button>
+          <div className="fs-info-row">
+            <div style={{ flex: 1, minWidth: 0, paddingRight: 16 }}>
+              <h1 className="fs-title">{song.title || "Unknown Track"}</h1>
+              <p className="fs-artist">{song.artistName || "Unknown Artist"}</p>
             </div>
+            <button
+              className="fs-icon-btn"
+              style={{ color: liked ? "var(--mf)" : "var(--fg)" }}
+              onClick={() => setLiked(!liked)}
+              aria-label={liked ? "Unlike song" : "Like song"}
+            >
+              <Heart size={26} fill={liked ? "currentColor" : "none"} />
+            </button>
+          </div>
 
-            {/* Progress */}
-            <div onClick={seek} style={{ height: 4, borderRadius: 2, background: theme.progressBg, cursor: "pointer", position: "relative" }}>
-              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${progress}%`, borderRadius: 2, background: theme.accent }} />
-              <div style={{ position: "absolute", top: "50%", left: `${progress}%`, transform: "translate(-50%, -50%)", width: 12, height: 12, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.5)" }} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, opacity: 0.55, marginTop: 8 }}>
-              <span>{formatTime(current)}</span>
+          <div className="fs-progress">
+            <input
+              type="range"
+              min="0"
+              max={duration || 0}
+              step="0.1"
+              value={Math.min(currentTime, duration || 0)}
+              disabled={!audioUrl || !duration}
+              onChange={seek}
+              aria-label="Song progress"
+            />
+            <div className="fs-time">
+              <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
             </div>
-
-            {/* Controls */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 36, marginTop: 22 }}>
-              <button onClick={prevTrack} disabled={index === 0} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: index === 0 ? 0.35 : 1, display: "flex" }}>
-                <SkipBack size={34} fill={theme.text} />
-              </button>
-              <button
-                onClick={toggle}
-                style={{
-                  width: 72, height: 72, borderRadius: "50%",
-                  background: theme.accent, border: "none",
-                  color: "#fff", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: "0 8px 24px rgba(124,92,255,0.45)",
-                }}
-              >
-                {playing ? <Pause size={30} fill="#fff" /> : <Play size={30} fill="#fff" style={{ marginLeft: 4 }} />}
-              </button>
-              <button onClick={nextTrack} disabled={index === queue.length - 1 && repeat !== "all"} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: (index === queue.length - 1 && repeat !== "all") ? 0.35 : 1, display: "flex" }}>
-                <SkipForward size={34} fill={theme.text} />
-              </button>
-            </div>
-
-            {/* Bottom row */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 30 }}>
-              <button onClick={openAddMenu} style={{ background: "none", border: "none", cursor: "pointer", color: theme.text, opacity: 0.8, display: "flex", padding: 8 }}>
-                <ListPlus size={22} />
-              </button>
-              <button
-                onClick={() => setShowLyrics(true)}
-                style={{
-                  background: "rgba(255,255,255,0.08)",
-                  border: `1px solid ${theme.border}`,
-                  borderRadius: 24, padding: "10px 22px",
-                  cursor: "pointer", color: theme.text, fontFamily: "inherit", fontSize: 13.5, fontWeight: 500,
-                  display: "flex", alignItems: "center", gap: 8,
-                }}
-              >
-                <MessageSquare size={16} /> Lyrics
-              </button>
-              <button onClick={cycleRepeat} style={{ background: "none", border: "none", cursor: "pointer", color: repeat !== "off" ? theme.accent : theme.text, opacity: repeat !== "off" ? 1 : 0.8, display: "flex", padding: 8 }}>
-                <RepeatIcon size={22} />
-              </button>
-            </div>
           </div>
 
-          {/* Add to playlist panel */}
-          {showAddMenu && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                position: "absolute", left: 16, right: 16, bottom: 16, zIndex: 250,
-                background: theme.bgRaised, border: `1px solid ${theme.border}`,
-                borderRadius: 12, padding: 16,
-                boxShadow: "0 12px 30px rgba(0,0,0,0.6)",
-              }}
+          {audioError && (
+            <p role="status" style={{
+              color: "#ff8c8c",
+              fontSize: 12,
+              textAlign: "center",
+              margin: "8px 0"
+            }}>
+              {audioError}
+            </p>
+          )}
+
+          <div className="fs-controls">
+            <button
+              className="fs-skip-btn"
+              onClick={() => changeTrack(index - 1)}
+              disabled={index <= 0}
+              aria-label="Previous song"
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Add to playlist</div>
-                <button onClick={() => setShowAddMenu(false)} style={{ background: "none", border: "none", color: theme.text, cursor: "pointer", display: "flex", padding: 0 }}>
-                  <X size={18} />
-                </button>
-              </div>
-              {myPlaylists.length === 0 ? (
-                <div style={{ fontSize: 12.5, opacity: 0.65, marginBottom: 10, lineHeight: 1.5 }}>
-                  You don't have any playlists yet.<br />Create one below to save this song.
-                </div>
-              ) : myPlaylists.map((p) => (
-                <button
-                  key={p.$id}
-                  onClick={() => addToPlaylist(p.$id)}
-                  disabled={addBusy}
-                  style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", color: theme.text, cursor: "pointer", fontSize: 13, padding: "8px 4px", fontFamily: "inherit" }}
-                >
-                  {p.name}
-                </button>
-              ))}
-              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <input
-                  style={{ ...inputStyle(), fontSize: 12.5, padding: "8px 10px" }}
-                  placeholder="New playlist name"
-                  value={newPlaylistName}
-                  onChange={(e) => setNewPlaylistName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && createAndAdd()}
-                />
-                <button
-                  onClick={createAndAdd}
-                  disabled={addBusy || !newPlaylistName.trim()}
-                  style={{ background: theme.accent, border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", padding: "0 14px", display: "flex", alignItems: "center" }}
-                >
-                  <Plus size={15} />
-                </button>
-              </div>
-              {addedMsg && <div style={{ fontSize: 11.5, color: theme.accent, marginTop: 8 }}>{addedMsg}</div>}
-            </div>
-          )}
+              <SkipBack />
+            </button>
 
-          {/* About overlay */}
-          {showAbout && (
-            <div
-              onClick={() => setShowAbout(false)}
-              style={{
-                position: "fixed", inset: 0, zIndex: 260,
-                background: theme.bg + "f5",
-                display: "flex", flexDirection: "column",
-                padding: "40px 24px 60px",
-              }}
+            <button
+              className="fs-play-btn"
+              onClick={togglePlayback}
+              disabled={!audioUrl || isLoading}
+              aria-label={isPlaying ? "Pause song" : "Play song"}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>About song</div>
-                <button
-                  onClick={() => setShowAbout(false)}
-                  style={{ background: "none", border: "none", color: theme.text, cursor: "pointer", display: "flex", padding: 4 }}
-                >
-                  <X size={22} />
-                </button>
-              </div>
+              {isPlaying ? <Pause /> : <Play style={{ marginLeft: 6 }} />}
+            </button>
 
-              <div
-                onClick={(e) => e.stopPropagation()}
-                style={{ flex: 1, overflowY: "auto", paddingBottom: 40 }}
-              >
-                <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 22 }}>
-                  <img
-                    src={fileUrl(song.coverArtField)}
-                    alt={song.title}
-                    style={{ width: 72, height: 72, borderRadius: 10, objectFit: "cover" }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 17, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song.title}</div>
-                    <button
-                      onClick={() => {
-                        setShowAbout(false);
-                        setExpanded(false);
-                        if (song.uploadedByUserId) navigate(`/artist/${song.uploadedByUserId}`);
-                      }}
-                      style={{
-                        background: "none", border: "none", padding: 0, marginTop: 4,
-                        cursor: "pointer", color: theme.accent, fontSize: 14,
-                        fontFamily: "inherit", textAlign: "left",
-                      }}
-                    >
-                      {song.artistName}
-                    </button>
-                  </div>
-                </div>
-
-                <AboutRow label="Genre" value={song.genre} />
-                <AboutRow label="Release type" value={song.releaseType} />
-                {song.albumName && <AboutRow label="Album" value={song.albumName} />}
-                <AboutRow label="Producer" value={song.producer} />
-                <AboutRow label="Songwriter" value={song.songWriter} />
-                {song.studio && <AboutRow label="Studio" value={song.studio} />}
-                {song.releasedAt && <AboutRow label="Released" value={new Date(song.releasedAt).toLocaleDateString()} />}
-                {song.$createdAt && <AboutRow label="Uploaded" value={new Date(song.$createdAt).toLocaleDateString()} />}
-
-                {song.description && (
-                  <div style={{ marginTop: 22, paddingTop: 20, borderTop: `1px solid ${theme.border}` }}>
-                    <div style={{ fontSize: 11.5, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Description</div>
-                    <div style={{ fontSize: 14, lineHeight: 1.7, opacity: 0.9, whiteSpace: "pre-wrap" }}>{song.description}</div>
-                  </div>
-                )}
-
-                {likeCount > 0 && (
-                  <div style={{ marginTop: 22, fontSize: 12.5, opacity: 0.6, textAlign: "center" }}>
-                    ♥ {likeCount} {likeCount === 1 ? "like" : "likes"}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Lyrics overlay */}
-          {showLyrics && (
-            <div
-              onClick={() => setShowLyrics(false)}
-              style={{
-                position: "fixed", inset: 0, zIndex: 260,
-                background: theme.bg + "f2",
-                display: "flex", flexDirection: "column",
-                padding: "40px 24px 60px",
-              }}
+            <button
+              className="fs-skip-btn"
+              onClick={() => changeTrack(index + 1)}
+              disabled={index >= queue.length - 1}
+              aria-label="Next song"
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>Lyrics</div>
-                <button onClick={() => setShowLyrics(false)} style={{ background: "none", border: "none", color: theme.text, cursor: "pointer", display: "flex", padding: 4 }}>
-                  <X size={22} />
-                </button>
-              </div>
-              <div
-                onClick={(e) => e.stopPropagation()}
-                style={{ flex: 1, overflowY: "auto", fontSize: 16, lineHeight: 1.9, whiteSpace: "pre-wrap", opacity: 0.9, textAlign: "center", paddingBottom: 40 }}
-              >
-                {song.lyrics || "No lyrics for this track."}
-              </div>
-            </div>
-          )}
+              <SkipForward />
+            </button>
+          </div>
 
-          {showReport && (
-            <ReportModal
-              targetType="song"
-              targetId={song.$id}
-              targetLabel={`${song.title} — ${song.artistName}`}
-              onClose={() => setShowReport(false)}
-            />
-          )}
-
-          {msgNote && (
-            <div style={{ position: "absolute", bottom: 100, left: 0, right: 0, textAlign: "center", fontSize: 12.5, color: theme.accent, opacity: 0.9 }}>
-              {msgNote}
-            </div>
+          {isLoading && (
+            <p style={{ textAlign: "center", fontSize: 12, opacity: 0.7 }}>
+              Loading audio…
+            </p>
           )}
         </div>
-      )}
-    </>
-  );
-}
 
-function MenuItem({ icon: Icon, label, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 10,
-        width: "100%", padding: "10px 12px",
-        background: "none", border: "none",
-        cursor: "pointer", color: theme.text,
-        fontSize: 13.5, fontFamily: "inherit", textAlign: "left",
-        borderRadius: 6,
-      }}
-    >
-      <Icon size={16} /> {label}
-    </button>
-  );
-}
+        <div className="fs-slide">
+          <div className="fs-slide-content">
+            <h2 className="fs-section-title">Lyrics</h2>
+            <div className="fs-lyrics-text">
+              {song.lyrics
+                ? song.lyrics.split("\n").map((line, i) => (
+                    <div key={i} style={{ marginBottom: 12 }}>{line}</div>
+                  ))
+                : "No lyrics available for this track."}
+            </div>
+          </div>
+        </div>
+      </div>
 
-function AboutRow({ label, value }) {
-  if (!value) return null;
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, padding: "9px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-      <div style={{ fontSize: 12, opacity: 0.55, textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 }}>{label}</div>
-      <div style={{ fontSize: 14, textAlign: "right", opacity: 0.95, wordBreak: "break-word" }}>{value}</div>
+      <div className="fs-tabs">
+        <button
+          className={`fs-tab-btn ${activeSlide === 0 ? "active" : ""}`}
+          onClick={() => goToSlide(0)}
+        >
+          <SlidersHorizontal size={20} />
+          <span>Info</span>
+        </button>
+
+        <button
+          className={`fs-tab-btn pill ${activeSlide === 1 ? "active" : ""}`}
+          onClick={() => goToSlide(1)}
+        >
+          <MessageSquare size={18} />
+          <span>Player</span>
+        </button>
+
+        <button
+          className={`fs-tab-btn ${activeSlide === 2 ? "active" : ""}`}
+          onClick={() => goToSlide(2)}
+        >
+          <ListMusic size={20} />
+          <span>Lyrics</span>
+        </button>
+      </div>
     </div>
   );
 }
