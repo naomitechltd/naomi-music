@@ -41,3 +41,5 @@
 #fs-player:not(.open) .fs-controls{margin:0;gap:4px}#fs-player:not(.open) .fs-play-btn{width:46px;height:46px}#fs-player:not(.open) .fs-skip-btn{width:38px;height:38px}
 @keyframes fsfloat{50%{transform:translateY(-8px)}}@keyframes fspop{40%{transform:scale(1.5)}}
 @media(prefers-reduced-motion:reduce){#fs-player *{animation:none!important}}
+
+
