@@ -474,11 +474,17 @@ export default function App() {
     setRefreshKey((value) => value + 1);
   };
 
-  // Open a conversation from another page.
-  const openChatFromAnywhere = (conversation) => {
-  setOpenConversation(conversation || null);
+const openChatFromAnywhere = (item) => {
+  // If a real conversation is passed, open it.
+  // If a song is passed (from the player), just go to the messages list.
+  if (item && (item.$id || item.id) && (item.participants || item.userIds || item.members)) {
+    setOpenConversation(item);
+  } else {
+    setOpenConversation(null);
+  }
   navigate("/messages");
 };
+
   // Logout.
   const handleLogout = async () => {
     try {
