@@ -11,6 +11,7 @@ import {
   Flame,
   Sparkles,
 } from "lucide-react";
+import { fileUrl as nmFileUrl } from "../lib/appwrite";
 
 export function BrowseView({
   currentUser,
@@ -86,7 +87,9 @@ export function BrowseView({
     song?.cover ||
     song?.imageUrl ||
     song?.artworkUrl ||
-    "";
+    (song?.coverFileId || song?.coverArtField
+      ? nmFileUrl(song.coverFileId || song.coverArtField)
+      : "");
 
   const getType = (song) =>
     String(song?.type || song?.category || "Song").toLowerCase();
@@ -527,7 +530,7 @@ export function BrowseView({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
             gap: 14,
           }}
         >
