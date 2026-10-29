@@ -1,5 +1,6 @@
 import "./player.css";
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronDown, Heart, MoreVertical, Play, Pause,
   SkipBack, SkipForward, SlidersHorizontal, ListMusic,
@@ -38,6 +39,8 @@ export function PlayerDock({
   const audioUrl = audioId ? fileUrl(audioId) : "";
   const coverId = song.coverFileId || song.coverArtField || "";
   const coverUrl = coverId ? fileUrl(coverId) : "/icon-512.svg";
+
+  const progress = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
 
   const formatTime = (seconds) => {
     if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -117,7 +120,8 @@ export function PlayerDock({
   }, [audioUrl, index, queue.length, setIndex]);
 
   useEffect(() => {
-    if (expanded && pagerRef.current) {
+    // Always land on the Player slide, whether expanding or minimizing
+    if (pagerRef.current) {
       const width = pagerRef.current.offsetWidth;
       pagerRef.current.scrollTo({ left: width, behavior: "auto" });
       setActiveSlide(1);
@@ -209,8 +213,24 @@ export function PlayerDock({
     setCurrentTime(value);
   };
 
-  return (
-    <div id="fs-player" className={expanded ? "open" : ""} style={{ "--cover": `url("${coverUrl}")` }}>
+  const handleDockClick = (event) => {
+    if (expanded) return;
+    if (event.target.closest("button, input, a")) return;
+    setExpanded(true);
+  };
+
+  if (typeof document === "undefined") return null;
+
+  // Rendered in a portal on <body>: if any ancestor has transform / filter /
+  // backdrop-filter, position:fixed becomes relative to that ancestor instead
+  // of the screen, which stretches the player taller than the viewport.
+  return createPortal(
+    <div
+      id="fs-player"
+      className={expanded ? "open" : ""}
+      onClick={handleDockClick}
+      style={{ "--cover": `url("${coverUrl}")`, "--progress": `${progress}%` }}
+    >
       <audio
         ref={audioRef}
         src={audioUrl || undefined}
@@ -387,8 +407,10 @@ export function PlayerDock({
         </div>
       </div>
 
-      <div className="fs-tabs">
+      <div className="fs-tabs" role="tablist" aria-label="Player sections">
         <button
+          role="tab"
+          aria-selected={activeSlide === 0}
           className={`fs-tab-btn ${activeSlide === 0 ? "active" : ""}`}
           onClick={() => goToSlide(0)}
         >
@@ -397,6 +419,8 @@ export function PlayerDock({
         </button>
 
         <button
+          role="tab"
+          aria-selected={activeSlide === 1}
           className={`fs-tab-btn pill ${activeSlide === 1 ? "active" : ""}`}
           onClick={() => goToSlide(1)}
         >
@@ -405,6 +429,8 @@ export function PlayerDock({
         </button>
 
         <button
+          role="tab"
+          aria-selected={activeSlide === 2}
           className={`fs-tab-btn ${activeSlide === 2 ? "active" : ""}`}
           onClick={() => goToSlide(2)}
         >
@@ -412,6 +438,7 @@ export function PlayerDock({
           <span>Lyrics</span>
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
