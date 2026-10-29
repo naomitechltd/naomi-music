@@ -76,7 +76,7 @@ async function submitSong(db, users, userId, userEmail, body) {
   const user = await users.get(userId);
   if (!user.emailVerification) return { error: "email-not-verified", code: 403 };
 
-  const rl = await checkRateLimit(db, `upload:${userId}`, 10, 24 * 60 * 60 * 1000);
+  const rl = await checkRateLimit(db, `upload:${userId}`, body.trackNumber ? 40 : 10, 24 * 60 * 60 * 1000);
   if (!rl.ok) return { error: "rate-limited", code: 429, retryAfterMs: rl.retryAfterMs, note: "Max 10 uploads per day." };
   const teams = new Teams(appwriteClient());
   const role = await getRole(teams, userId);
@@ -86,7 +86,7 @@ async function submitSong(db, users, userId, userEmail, body) {
     title, artistName, description = "", studio = "",
     producer = "", songWriter = "", releaseType = "single", albumName = "",
     genre, lyrics, coverArtField, audioField = "",
-    contentType = "song",
+    contentType = "song", featuring = "", trackNumber = 0,
   } = body;
 
   if (!["song", "poem"].includes(contentType)) return { error: "invalid contentType", code: 400 };
@@ -105,7 +105,7 @@ async function submitSong(db, users, userId, userEmail, body) {
     if (releaseType === "album" && !albumName) return { error: "album name required", code: 400 };
   }
 
-  const row = await db.createRow(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, "unique()", {
+  const data = {
     title, artistName, description, studio,
     producer: isPoem ? "" : producer,
     songWriter: isPoem ? artistName : songWriter,
@@ -117,7 +117,19 @@ async function submitSong(db, users, userId, userEmail, body) {
     status: "pending",
     uploadedByEmail: userEmail || user.email || "",
     uploadedByUserId: userId,
-  });
+  };
+  const extras = {};
+  const feat = String(featuring || "").trim().slice(0, 255);
+  if (feat) extras.featuring = feat;
+  const tn = parseInt(trackNumber, 10);
+  if (tn > 0 && tn <= 100) extras.trackNumber = tn;
+  let row;
+  try {
+    row = await db.createRow(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, "unique()", { ...data, ...extras });
+  } catch (e) {
+    if (!Object.keys(extras).length) throw e;
+    row = await db.createRow(process.env.DATABASE_ID, process.env.SONGS_TABLE_ID, "unique()", data);
+  }
   return { ok: true, id: row.$id };
 }
 
