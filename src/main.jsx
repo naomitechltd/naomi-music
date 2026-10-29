@@ -6,6 +6,7 @@ import App from "./App.jsx";
 import "./theme.css";
 import "./hide-badge.css";
 import { initTheme } from "./components/ui";
+import "./modern.css";
 
 initTheme();
 
