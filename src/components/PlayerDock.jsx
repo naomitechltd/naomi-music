@@ -7,6 +7,7 @@ import {
   MessageSquare, Share2, Shuffle, Repeat
 } from "lucide-react";
 import { fileUrl } from "../lib/appwrite";
+import { RatingsAndComments } from "./RatingsAndComments";
 
 export function PlayerDock({
   queue = [],
@@ -278,6 +279,14 @@ export function PlayerDock({
               {song.artistBio ||
                 `${song.artistName || "This artist"} is an independent creator on Naomi Music.`}
             </p>
+
+            {(song.$id || song.id) && (
+              <RatingsAndComments
+                key={song.$id || song.id}
+                songId={song.$id || song.id}
+                currentUser={currentUser}
+              />
+            )}
           </div>
         </div>
 
