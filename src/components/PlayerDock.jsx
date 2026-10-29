@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   ChevronDown, Heart, MoreVertical, Play, Pause,
   SkipBack, SkipForward, SlidersHorizontal, ListMusic,
-  MessageSquare
+  MessageSquare, Share2, Shuffle, Repeat
 } from "lucide-react";
 import { fileUrl } from "../lib/appwrite";
 
@@ -21,6 +21,7 @@ export function PlayerDock({
   const audioRef = useRef(null);
   const pagerRef = useRef(null);
   const seekingRef = useRef(false);
+  const modeRef = useRef({ shuffle: false, repeat: false });
 
   const [activeSlide, setActiveSlide] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -29,6 +30,9 @@ export function PlayerDock({
   const [audioError, setAudioError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [liked, setLiked] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const audioId = song.audioField || song.audioFileId || "";
   const audioUrl = audioId ? fileUrl(audioId) : "";
@@ -61,6 +65,7 @@ export function PlayerDock({
 
     setIsLoading(true);
     audio.load();
+    audio.play().catch(() => {});
 
     const handleLoaded = () => {
       setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
@@ -86,7 +91,9 @@ export function PlayerDock({
     };
 
     const handleEnded = () => {
+      if (modeRef.current.repeat) { audio.currentTime = 0; audio.play().catch(() => {}); return; }
       setIsPlaying(false);
+      if (modeRef.current.shuffle && queue.length > 1) { setIndex(Math.floor(Math.random() * queue.length)); return; }
       if (index < queue.length - 1) setIndex(index + 1);
     };
 
@@ -143,6 +150,35 @@ export function PlayerDock({
     }
   };
 
+  const toggleMode = (key) => {
+    modeRef.current[key] = !modeRef.current[key];
+    if (key === "shuffle") setShuffle(modeRef.current.shuffle);
+    else setRepeat(modeRef.current.repeat);
+  };
+
+  const flash = (text) => {
+    setNotice(text);
+    setTimeout(() => setNotice(""), 1800);
+  };
+
+  const shareSong = async () => {
+    const text = `${song.title || "A song"} by ${song.artistName || "an artist"} on Naomi Music`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: song.title || "Naomi Music", text, url: window.location.origin });
+        return;
+      }
+    } catch (e) {
+      if (e?.name === "AbortError") return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${window.location.origin}`);
+      flash("Link copied");
+    } catch {
+      flash("Could not share");
+    }
+  };
+
   const changeTrack = (nextIndex) => {
     if (!queue.length || nextIndex < 0 || nextIndex >= queue.length) return;
     setIndex(nextIndex);
@@ -174,7 +210,7 @@ export function PlayerDock({
   };
 
   return (
-    <div id="fs-player" className={expanded ? "open" : ""}>
+    <div id="fs-player" className={expanded ? "open" : ""} style={{ "--cover": `url("${coverUrl}")` }}>
       <audio
         ref={audioRef}
         src={audioUrl || undefined}
@@ -243,14 +279,17 @@ export function PlayerDock({
               <h1 className="fs-title">{song.title || "Unknown Track"}</h1>
               <p className="fs-artist">{song.artistName || "Unknown Artist"}</p>
             </div>
-            <button
-              className="fs-icon-btn"
-              style={{ color: liked ? "var(--mf)" : "var(--fg)" }}
-              onClick={() => setLiked(!liked)}
-              aria-label={liked ? "Unlike song" : "Like song"}
-            >
-              <Heart size={26} fill={liked ? "currentColor" : "none"} />
-            </button>
+            <div className="fs-actions">
+              <button className={`fs-icon-btn ${liked ? "liked" : ""}`} onClick={() => setLiked(!liked)} aria-label={liked ? "Unlike song" : "Like song"}>
+                <Heart size={24} fill={liked ? "currentColor" : "none"} />
+              </button>
+              <button className="fs-icon-btn" onClick={() => onOpenChat?.(song)} aria-label="Chat with fans">
+                <MessageSquare size={22} />
+              </button>
+              <button className="fs-icon-btn" onClick={shareSong} aria-label="Share song">
+                <Share2 size={22} />
+              </button>
+            </div>
           </div>
 
           <div className="fs-progress">
@@ -282,6 +321,7 @@ export function PlayerDock({
           )}
 
           <div className="fs-controls">
+            <button className={`fs-mode-btn ${shuffle ? "on" : ""}`} onClick={() => toggleMode("shuffle")} aria-label="Shuffle"><Shuffle size={22} /></button>
             <button
               className="fs-skip-btn"
               onClick={() => changeTrack(index - 1)}
@@ -308,12 +348,28 @@ export function PlayerDock({
             >
               <SkipForward />
             </button>
+
+            <button className={`fs-mode-btn ${repeat ? "on" : ""}`} onClick={() => toggleMode("repeat")} aria-label="Repeat"><Repeat size={22} /></button>
           </div>
 
           {isLoading && (
             <p style={{ textAlign: "center", fontSize: 12, opacity: 0.7 }}>
               Loading audio…
             </p>
+          )}
+
+          {notice && <p role="status" className="fs-notice">{notice}</p>}
+
+          {queue.length > 1 && (
+            <div className="fs-queue">
+              <h4>Up next</h4>
+              {queue.map((q, n) => n === index ? null : (
+                <button key={q.$id || q.id || n} className="fs-q-row" onClick={() => setIndex(n)}>
+                  <span><b>{q.title || "Untitled"}</b><small>{q.artistName || "Unknown Artist"}</small></span>
+                  <MoreVertical size={18} />
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
