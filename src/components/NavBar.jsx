@@ -1,11 +1,40 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { theme } from "./ui";
+import { fetchMyRole } from "../lib/role";
 
 export function NavBar({ currentUser, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const [role, setRole] = useState("listener");
+
+  useEffect(() => {
+    let on = true;
+    fetchMyRole().then((r) => { if (on) setRole(r); });
+    return () => { on = false; };
+  }, [currentUser?.$id]);
+
+  const items = [
+    { label: "Home", path: "/" },
+    { label: "Trending", path: "/trending" },
+    { label: "Artists", path: "/artists" },
+    { label: "Playlists", path: "/playlists" },
+    { label: "Radio", path: "/radio" },
+    { label: "Messages", path: "/messages" },
+    { label: "⬆ Upload", path: "/upload" },
+    { label: "🎵 My Songs", path: "/mysongs" },
+    { label: "My Profile", path: "/profile" },
+    ...(role === "admin"
+      ? [
+          { label: "🛡 Approval queue", path: "/admin" },
+          { label: "🛡 Reports", path: "/admin/reports" },
+          { label: "🛡 Notices", path: "/admin/notices" },
+          { label: "🛡 Analytics", path: "/admin/analytics" },
+        ]
+      : []),
+    { label: "🎨 Themes & Appearance", path: "/settings/theme" },
+  ];
 
   const initial =
     currentUser?.name?.charAt(0)?.toUpperCase() || "J";
@@ -120,6 +149,8 @@ export function NavBar({ currentUser, onLogout }) {
             top: "calc(100% + 8px)",
             right: 16,
             width: 230,
+            maxHeight: "75vh",
+            overflowY: "auto",
             padding: 8,
             background: theme.surface,
             border: `1px solid ${theme.border}`,
@@ -129,16 +160,7 @@ export function NavBar({ currentUser, onLogout }) {
             gap: 4,
           }}
         >
-          {[
-            { label: "Home", path: "/" },
-            { label: "Trending", path: "/trending" },
-            { label: "Artists", path: "/artists" },
-            { label: "Playlists", path: "/playlists" },
-            { label: "Radio", path: "/radio" },
-            { label: "Messages", path: "/messages" },
-            { label: "My Profile", path: "/profile" },
-            { label: "🎨 Themes & Appearance", path: "/settings/theme" },
-          ].map((item) => (
+          {items.map((item) => (
             <button
               key={item.path}
               type="button"
