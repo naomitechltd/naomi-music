@@ -528,3 +528,5 @@
     width: min(62vw, 270px);
   }
 }
+.fs-wave{display:block;width:100%;height:76px;touch-action:none;cursor:pointer;border-radius:14px;outline:none}
+.fs-wave:focus-visible{outline:2px solid var(--pl,#c8e84a)}
