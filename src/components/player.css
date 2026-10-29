@@ -129,7 +129,7 @@
 #fs-player.open .fs-slide.fs-main {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: safe center;
   align-items: center;
   min-height: 100%;
   height: 100%;
@@ -321,8 +321,9 @@
 /* Bottom tabs */
 .fs-tabs {
   display: flex;
-  justify-content: space-around;
-  margin: 6px 14px calc(12px + env(safe-area-inset-bottom));
+  gap: 4px;
+  width: min(calc(100% - 28px), 460px);
+  margin: 6px auto calc(12px + env(safe-area-inset-bottom));
   padding: 6px;
   border-radius: 99px;
   background: rgba(255, 255, 255, 0.1);
@@ -332,24 +333,47 @@
 }
 
 .fs-tab-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  font-size: 12px;
-  padding: 10px 18px;
+  padding: 0 14px;
   border-radius: 99px;
-  opacity: 0.65;
+  opacity: 0.7;
 }
 
-.fs-tab-btn.active {
+/* #fs-player prefix needed: "#fs-player button" would otherwise win */
+#fs-player .fs-tab-btn {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#fs-player .fs-tab-btn:hover:not(.active) {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+#fs-player .fs-tab-btn:focus-visible {
+  outline: 2px solid var(--pl);
+  outline-offset: 2px;
+}
+
+#fs-player .fs-tab-btn.active {
   opacity: 1;
   background: var(--pl) !important;
-  color: #1b2006;
+  color: #1b2006; /* dark text on lime: was washed-out white before */
+  box-shadow: 0 6px 18px rgba(200, 232, 74, 0.28);
 }
 
 /* ===== MINIMIZED (DOCK) STATE ===== */
 #fs-player:not(.open) {
-  inset: auto 10px calc(10px + env(safe-area-inset-bottom)) 10px;
+  inset: auto 0 calc(10px + env(safe-area-inset-bottom)) 0;
+  width: min(calc(100% - 20px), 560px);
+  margin-inline: auto;
+  cursor: pointer;
   height: 76px;
   padding: 0;
   flex-direction: row;
@@ -357,7 +381,33 @@
   transform: none;
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: box-shadow 0.25s, transform 0.25s;
+}
+
+#fs-player:not(.open):hover {
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(200, 232, 74, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Thin progress line along the bottom edge of the dock */
+#fs-player:not(.open)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 2;
+  height: 3px;
+  width: var(--progress, 0%);
+  background: var(--pl);
+  box-shadow: 0 0 10px var(--pl);
+  border-radius: 0 3px 3px 0;
+  transition: width 0.25s linear;
+  pointer-events: none;
 }
 
 #fs-player:not(.open) .fs-header {
@@ -368,7 +418,6 @@
 #fs-player:not(.open) .fs-header > :not(:first-child),
 #fs-player:not(.open) .fs-tabs,
 #fs-player:not(.open) .fs-slide:not(.fs-main),
-#fs-player:not(.open) .fs-cover-container,
 #fs-player:not(.open) .fs-progress,
 #fs-player:not(.open) .fs-main > p,
 #fs-player:not(.open) .fs-actions,
@@ -408,8 +457,29 @@
   margin: 0;
 }
 
+#fs-player:not(.open) .fs-cover-container {
+  margin: 0 12px 0 0;
+  flex-shrink: 0;
+}
+
+#fs-player:not(.open) .fs-cover {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  animation: none;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
 #fs-player:not(.open) .fs-title {
   font-size: 16px;
+}
+
+#fs-player:not(.open) .fs-artist {
+  margin-top: 2px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #fs-player:not(.open) .fs-controls {
