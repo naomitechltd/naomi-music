@@ -280,7 +280,10 @@ export function PlayerDock({
 
         <button
           className="fs-icon-btn"
-          onClick={() => onOpenChat?.(song)}
+          onClick={() => {
+  setExpanded(false);          // close the player
+  onOpenChat?.(null);          // or just navigate
+}}
           aria-label="Open chat"
           title="Chat"
         >
