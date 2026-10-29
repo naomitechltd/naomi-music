@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Star, Trash2, Send } from "lucide-react";
 import { submitRating, listRatings, submitComment, listComments, deleteComment } from "../lib/api";
 import { fileUrl } from "../lib/appwrite";
@@ -13,37 +13,48 @@ export function RatingsAndComments({ songId, currentUser }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const loadRatings = async () => {
+  // Ignore responses that arrive after the song has changed
+  const activeId = useRef(songId);
+
+  const loadRatings = async (id = songId) => {
     try {
-      const r = await listRatings(songId);
+      const r = await listRatings(id);
+      if (activeId.current !== id) return;
       setRating({ average: r.average || 0, total: r.total || 0, myRating: r.myRating || 0 });
     } catch {}
   };
 
-  const loadAllComments = async () => {
+  const loadAllComments = async (id = songId) => {
     setLoadingComments(true);
     try {
-      const res = await listComments(songId, 100);
+      const res = await listComments(id, 100);
+      if (activeId.current !== id) return;
       setComments(res.comments || []);
     } catch (e) {
-      setError(e.message);
+      if (activeId.current === id) setError(e.message);
     } finally {
-      setLoadingComments(false);
+      if (activeId.current === id) setLoadingComments(false);
     }
   };
 
   useEffect(() => {
+    activeId.current = songId;
     setComments([]);
+    setText("");
+    setError("");
     setRating({ average: 0, total: 0, myRating: 0 });
-    loadRatings();
-    loadAllComments();
+    loadRatings(songId);
+    loadAllComments(songId);
   }, [songId]);
 
   const setMyRating = async (v) => {
+    const previous = rating.myRating;
+    setRating((r) => ({ ...r, myRating: v })); // instant feedback
     try {
       await submitRating(songId, v);
       await loadRatings();
     } catch (e) {
+      setRating((r) => ({ ...r, myRating: previous }));
       setError(e.message);
     }
   };
@@ -92,6 +103,8 @@ export function RatingsAndComments({ songId, currentUser }) {
                 return (
                   <button
                     key={n}
+                    aria-label={`Rate ${n} star${n === 1 ? "" : "s"}`}
+                    aria-pressed={rating.myRating === n}
                     onClick={() => setMyRating(n)}
                     onMouseEnter={() => setHoverValue(n)}
                     onMouseLeave={() => setHoverValue(0)}
@@ -130,11 +143,20 @@ export function RatingsAndComments({ songId, currentUser }) {
           placeholder="Add a comment…"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter sends, Shift+Enter makes a new line
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              sendComment();
+            }
+          }}
+          aria-label="Add a comment"
           maxLength={500}
           disabled={busy}
         />
         <button
           onClick={sendComment}
+          aria-label="Post comment"
           disabled={busy || !text.trim()}
           style={{
             background: theme.accent,
@@ -184,6 +206,7 @@ export function RatingsAndComments({ songId, currentUser }) {
               <button
                 onClick={() => remove(c.$id)}
                 title="Delete"
+                aria-label="Delete comment"
                 style={{ background: "none", border: "none", cursor: "pointer", color: theme.danger, opacity: 0.6, display: "flex", padding: 4 }}
               >
                 <Trash2 size={14} />
