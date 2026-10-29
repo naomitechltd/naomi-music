@@ -476,10 +476,9 @@ export default function App() {
 
   // Open a conversation from another page.
   const openChatFromAnywhere = (conversation) => {
-    setOpenConversation(conversation);
-    navigate("/messages");
-  };
-
+  setOpenConversation(conversation || null);
+  navigate("/messages");
+};
   // Logout.
   const handleLogout = async () => {
     try {
