@@ -541,3 +541,73 @@ body.has-mini-dock {
   box-sizing: border-box;
   padding-bottom: var(--dock-clearance);
 }
+
+/* "Up next" list: full width, rows left-aligned with the menu icon on the right */
+#fs-player.open .fs-queue {
+  width: 100%;
+  max-width: 480px;
+  flex-shrink: 0;
+}
+
+.fs-q-row span {
+  flex: 1;
+  align-items: flex-start;
+  text-align: left;
+}
+
+/* ==========================================================
+   Desktop layout: Info | Player | Lyrics side by side
+   Append to the END of player.css. CSS only, no JSX changes.
+   Only applies to the expanded player on wide screens, so the
+   mobile swipe pager and the minimized dock are untouched.
+   ========================================================== */
+@media (min-width: 1100px) {
+  #fs-player.open .fs-pager {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(0, 480px) minmax(260px, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 32px;
+    width: 100%;
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 8px 40px 24px;
+    box-sizing: border-box;
+    overflow: hidden;          /* no horizontal swiping on desktop */
+    scroll-snap-type: none;
+  }
+
+  /* Side panels: Info (left) and Lyrics (right) as glass cards */
+  #fs-player.open .fs-slide:not(.fs-main) {
+    min-width: 0;
+    min-height: 0;
+    padding: 24px 26px;
+    border-radius: 26px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(18px);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  }
+
+  #fs-player.open .fs-slide:not(.fs-main) .fs-slide-content {
+    max-width: none;
+    padding-top: 0;
+  }
+
+  #fs-player.open .fs-slide.fs-main {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* All three sections are visible, so the tab bar isn't needed */
+  #fs-player.open .fs-tabs {
+    display: none;
+  }
+}
+
+/* Very wide screens: a bit more breathing room */
+@media (min-width: 1600px) {
+  #fs-player.open .fs-pager {
+    gap: 48px;
+  }
+}
