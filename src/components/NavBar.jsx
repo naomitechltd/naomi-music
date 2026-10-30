@@ -4,9 +4,32 @@ import { useNavigate } from "react-router-dom";
 import { theme } from "./ui";
 import { fetchMyRole } from "../lib/role";
 
+// Logo rotation: [what to show, how long in ms]
+const LOGO_SEQ = [
+  ["brand", 30000],
+  ["home", 15000],
+  ["brand", 15000],
+  ["greet", 15000],
+  ["brand", 15000],
+];
+
 export function NavBar({ currentUser, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const [logoStep, setLogoStep] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(
+      () => setLogoStep((n) => (n + 1) % LOGO_SEQ.length),
+      LOGO_SEQ[logoStep][1]
+    );
+    return () => clearTimeout(t);
+  }, [logoStep]);
+  const logoKind = LOGO_SEQ[logoStep][0];
+  const firstName = (currentUser?.name || "").split(" ")[0];
+  const hour = new Date().getHours();
+  const greeting =
+    (hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening") +
+    (firstName ? ", " + firstName : "");
   const [role, setRole] = useState("listener");
 
   useEffect(() => {
@@ -75,7 +98,20 @@ export function NavBar({ currentUser, onLogout }) {
           fontWeight: 700,
         }}
       >
-        Naomi <span style={{ color: theme.accent }}>Music</span>
+        <span
+          key={logoStep}
+          style={{ display: "inline-block", animation: "nmLogo .5s cubic-bezier(.2,.8,.2,1) both" }}
+        >
+          {logoKind === "home" ? (
+            "Home"
+          ) : logoKind === "greet" ? (
+            <span style={{ fontSize: 18, display: "inline-block", maxWidth: "52vw", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom" }}>
+              {greeting}
+            </span>
+          ) : (
+            <>Naomi <span style={{ color: theme.accent }}>Music</span></>
+          )}
+        </span>
       </button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
