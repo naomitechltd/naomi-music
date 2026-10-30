@@ -53,6 +53,7 @@ import {
 } from "./pages/StaticPages";
 
 import { PlayerDock } from "./components/PlayerDock";
+import { GenreView } from "./pages/GenreView";
 import { NavBar } from "./components/NavBar";
 import { EmailVerifyBanner } from "./components/EmailVerifyBanner";
 import { CompleteProfileBanner } from "./components/CompleteProfileBanner";
@@ -729,6 +730,7 @@ const openChatFromAnywhere = (item) => {
           }
         />
 
+        <Route path="/genre/:name" element={<GenreView onPlaySong={playSong} />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />

@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 
 import React, { useMemo, useState } from "react";
 import { theme } from "../components/ui";
@@ -18,6 +19,7 @@ export function BrowseView({
   onPlaySong,
   songs = [],
 }) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [view, setView] = useState("grid");
   const [category, setCategory] = useState("All");
@@ -603,11 +605,7 @@ export function BrowseView({
                 key={genre.label}
                 type="button"
                 aria-pressed={active}
-                onClick={() =>
-                  setSelectedGenre(
-                    active ? "All" : genre.label
-                  )
-                }
+                onClick={() => navigate("/genre/" + encodeURIComponent(genre.label))}
                 style={{
                   minHeight: 135,
                   borderRadius: theme.radiusLg,
