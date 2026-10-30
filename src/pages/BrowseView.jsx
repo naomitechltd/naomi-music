@@ -1,3 +1,4 @@
+import TeaserRow from "../components/TeaserRow";
 import { useNavigate } from "react-router-dom";
 
 import React, { useMemo, useState } from "react";
@@ -413,6 +414,8 @@ export function BrowseView({
           </button>
         </div>
       </div>
+
+      <TeaserRow />
 
       {recentSongs.length > 0 && (
         <section style={{ marginBottom: 30 }}>

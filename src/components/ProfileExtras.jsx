@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { functions, tablesDB, DATABASE_ID, PLAYLISTS_TABLE_ID, Query } from "../lib/appwrite";
 import "./profile-extras.css";
+import TeaserUpload from "./TeaserUpload";
 
 async function api(body) {
   try {
@@ -56,6 +57,8 @@ export default function ProfileExtras({ currentUser }) {
         <div><b>{followers}</b><span>Followers</span></div>
         <div><b>{following}</b><span>Following</span></div>
       </div>
+
+      <TeaserUpload />
 
       <h2 className="pe-h">Public playlists</h2>
       <div className="pe-card">

@@ -134,6 +134,77 @@ async function submitSong(db, users, userId, userEmail, body) {
 }
 
 
+// ---- Upcoming teasers: a 30-second clip that lives for 7 days ----
+const TEASER_MS = 7 * 24 * 60 * 60 * 1000;
+
+async function purgeTeaser(db, storage, row) {
+  for (const fid of [row.mediaField, row.coverField]) {
+    if (fid) { try { await storage.deleteFile(process.env.CHAT_BUCKET_ID, fid); } catch {} }
+  }
+  try { await db.deleteRow(process.env.DATABASE_ID, process.env.TEASERS_TABLE_ID, row.$id); } catch {}
+}
+
+const teaserOut = (r) => ({
+  id: r.$id, title: r.title, artistName: r.artistName, userId: r.userId,
+  mediaField: r.mediaField, mediaType: r.mediaType, coverField: r.coverField || "",
+  durationSec: r.durationSec || 0, createdAt: r.createdAt, expiresAt: r.expiresAt,
+});
+
+async function listTeasers(db, storage) {
+  const now = Date.now();
+  let rows;
+  try {
+    const r = await db.listRows(process.env.DATABASE_ID, process.env.TEASERS_TABLE_ID, [Query.orderDesc("$createdAt"), Query.limit(100)]);
+    rows = r.rows || [];
+  } catch (e) {
+    return { ok: true, teasers: [] };
+  }
+  try {
+    const old = await db.listRows(process.env.DATABASE_ID, process.env.TEASERS_TABLE_ID, [Query.orderAsc("$createdAt"), Query.limit(25)]);
+    for (const r of old.rows || []) if (r.expiresAt <= now) await purgeTeaser(db, storage, r);
+  } catch {}
+  return { ok: true, teasers: rows.filter((r) => r.expiresAt > now).map(teaserOut) };
+}
+
+async function createTeaser(db, users, teams, userId, body) {
+  const user = await users.get(userId);
+  if (!user.emailVerification) return { error: "email-not-verified", code: 403 };
+  const role = await getRole(teams, userId);
+  if (role !== "artist" && role !== "admin") return { error: "forbidden", code: 403 };
+  const rl = await checkRateLimit(db, `teaser:${userId}`, 6, 24 * 60 * 60 * 1000);
+  if (!rl.ok) return { error: "Too many teasers today. Try again tomorrow.", code: 429 };
+  const { title, mediaField, mediaType, coverField = "", durationSec } = body;
+  const dur = Number(durationSec);
+  if (!title || !mediaField || !["audio", "video"].includes(mediaType)) return { error: "missing fields", code: 400 };
+  if (!(dur > 0 && dur <= 31)) return { error: "A teaser can be 30 seconds at most.", code: 400 };
+  const now = Date.now();
+  if (role !== "admin") {
+    const mine = await db.listRows(process.env.DATABASE_ID, process.env.TEASERS_TABLE_ID, [Query.orderDesc("$createdAt"), Query.limit(100)]).catch(() => ({ rows: [] }));
+    const live = (mine.rows || []).filter((r) => r.userId === userId && r.expiresAt > now);
+    if (live.length >= 2) return { error: "You already have 2 live teasers. Wait for one to expire or delete one.", code: 400 };
+  }
+  const row = await db.createRow(process.env.DATABASE_ID, process.env.TEASERS_TABLE_ID, "unique()", {
+    title: String(title).slice(0, 100),
+    artistName: String(user.name || "").slice(0, 255),
+    userId, mediaField, mediaType, coverField,
+    durationSec: Math.round(dur),
+    createdAt: now,
+    expiresAt: now + TEASER_MS,
+  });
+  return { ok: true, id: row.$id };
+}
+
+async function deleteTeaser(db, teams, storage, userId, body) {
+  if (!userId || !body.teaserId) return { error: "missing fields", code: 400 };
+  let row;
+  try { row = await db.getRow(process.env.DATABASE_ID, process.env.TEASERS_TABLE_ID, body.teaserId); }
+  catch { return { error: "not found", code: 404 }; }
+  const role = await getRole(teams, userId);
+  if (row.userId !== userId && role !== "admin") return { error: "forbidden", code: 403 };
+  await purgeTeaser(db, storage, row);
+  return { ok: true };
+}
+
 async function checkRateLimit(db, key, limit, windowMs) {
   const now = Date.now();
   const rowId = key.replace(/[^a-zA-Z0-9_:-]/g, "_").slice(0, 36);
@@ -1425,6 +1496,9 @@ export default async ({ req, res, log, error }) => {
     if (action === "set-role") { const out = await setRole(teams, userId, body.role); return res.json(out, out.code || 200); }
     if (action === "submit-song") { const out = await submitSong(db, users, userId, userEmail, body); return res.json(out, out.code || 200); }
 
+    if (action === "create-teaser") { const out = await createTeaser(db, users, teams, userId, body); return res.json(out, out.code || 200); }
+    if (action === "list-teasers") { const out = await listTeasers(db, storage); return res.json(out, 200); }
+    if (action === "delete-teaser") { const out = await deleteTeaser(db, teams, storage, userId, body); return res.json(out, out.code || 200); }
     if (action === "report") { const out = await submitReport(db, users, userId, body); return res.json(out, out.code || 200); }
     if (action === "list-reports") { const out = await listReports(db, teams, userId); return res.json(out, out.code || 200); }
     if (action === "resolve-report") { const out = await resolveReport(db, teams, userId, body); return res.json(out, out.code || 200); }
