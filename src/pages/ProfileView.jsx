@@ -35,6 +35,7 @@ import {
   Role,
   fileUrl,
 } from "../lib/appwrite";
+import ProfileExtras from "../components/ProfileExtras";
 
 import {
   theme,
@@ -1059,6 +1060,8 @@ export function ProfileView({
           </div>
         </div>
       </section>
+
+      <ProfileExtras currentUser={currentUser} />
 
       {/* STATUS MESSAGES */}
 

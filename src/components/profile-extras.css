@@ -1,0 +1,17 @@
+.naomi-profile .profile-header{flex-direction:column!important;align-items:center!important;text-align:center!important;gap:14px!important;border:0!important;background:linear-gradient(180deg,var(--accent-soft),transparent)!important;padding-top:28px!important}
+.naomi-profile .profile-heading{align-items:center!important;text-align:center!important;width:100%}
+.naomi-profile .profile-name-row,.naomi-profile .profile-email,.naomi-profile .profile-meta{justify-content:center!important}
+.naomi-profile .profile-name{font-size:30px!important;letter-spacing:-.02em}
+.naomi-profile .avatar-button,.naomi-profile .avatar-image,.naomi-profile .avatar-placeholder{width:116px!important;height:116px!important}
+.pe-edit{display:block;margin:0 auto 22px;padding:10px 26px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font:inherit;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:transform .2s,background .25s}
+.pe-edit:hover{background:var(--card-hover)}.pe-edit:active{transform:scale(.95)}
+.pe-stats{display:flex;justify-content:space-around;text-align:center;padding:6px 0 22px}
+.pe-stats b{display:block;font-size:20px}.pe-stats span{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)}
+.pe-h{font-size:22px;font-weight:800;margin:6px 0 12px;letter-spacing:-.02em}
+.pe-card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:6px 14px;margin-bottom:22px}
+.pe-row{display:flex;align-items:center;gap:14px;width:100%;padding:11px 0;border:0;border-bottom:1px solid var(--divider);background:none;color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:padding .2s}
+.pe-row:last-child{border-bottom:0}.pe-row:hover{padding-left:6px}
+.pe-art{width:48px;height:48px;border-radius:10px;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;background:linear-gradient(135deg,var(--c1),var(--c2))}
+.pe-art.round{border-radius:50%}
+.pe-txt{flex:1;min-width:0}.pe-txt b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pe-txt small{color:var(--text-dim)}
+.pe-more{color:var(--text-muted);font-weight:600}
