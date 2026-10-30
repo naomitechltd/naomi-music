@@ -1,6 +1,6 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, Pause, Radio as RadioIcon } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { functions, fileUrl } from "../lib/appwrite";
 import { theme } from "../components/ui";
 
@@ -30,10 +30,12 @@ function formatTime(sec) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+const BARS = 72;
+const DOTS = ["#39d98a", "#60a5fa", "var(--accent)"];
+
 export function RadioView() {
   const navigate = useNavigate();
   const audioRef = useRef(null);
-  // Single source of truth for what we're currently playing
   const cur = useRef({ songId: null, seq: null, seekMs: 0, needsLoad: false });
 
   const [song, setSong] = useState(null);
@@ -42,14 +44,21 @@ export function RadioView() {
   const [duration, setDuration] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [upNext, setUpNext] = useState([]);
+  const [listeners, setListeners] = useState(null);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
 
-  // Audio element listeners (bound once)
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) { audio.volume = volume; audio.muted = muted; }
+  }, [volume, muted]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     const onMeta = () => {
-      // Only act if we're expecting a fresh load
       if (!cur.current.needsLoad) return;
       cur.current.needsLoad = false;
 
@@ -63,7 +72,6 @@ export function RadioView() {
         .then(() => setPlaying(true))
         .catch(() => setPlaying(false));
 
-      // Report duration for the server scheduler (once per song)
       if (cur.current.songId) {
         callRadioNow({ songId: cur.current.songId, durationMs: Math.round(d * 1000) });
       }
@@ -85,7 +93,6 @@ export function RadioView() {
     };
   }, []);
 
-  // Poll the server
   useEffect(() => {
     let stopped = false;
     let inFlight = false;
@@ -103,13 +110,16 @@ export function RadioView() {
         setLoading(false);
         setError("");
 
+        const up = out.upNext || out.queue || out.next;
+        setUpNext(Array.isArray(up) ? up.slice(0, 3) : up ? [up] : []);
+        setListeners(out.listeners ?? out.listenerCount ?? null);
+
         const audio = audioRef.current;
         if (!audio) return;
 
         const sId = out.song.$id;
         const seq = out.sequence ?? 0;
 
-        // Different song OR sequence changed → load it
         if (cur.current.songId !== sId || cur.current.seq !== seq) {
           cur.current = {
             songId: sId,
@@ -120,13 +130,11 @@ export function RadioView() {
           setSong(out.song);
           setDuration(0);
           setCurrent(0);
-          // Force a fresh load even if the same src was cached
           audio.src = fileUrl(out.song.audioField);
           try { audio.load(); } catch {}
           return;
         }
 
-        // Same song — gentle drift correction
         if (!audio.paused && audio.readyState >= 2 && out.durationMs > 0) {
           const drift = audio.currentTime * 1000 - out.elapsedMs;
           if (Math.abs(drift) > 4000) {
@@ -152,91 +160,130 @@ export function RadioView() {
 
   const progress = duration ? (current / duration) * 100 : 0;
 
-  return (
-    <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 20px 120px", minHeight: "calc(100vh - 57px)" }}>
-      <audio ref={audioRef} preload="auto" />
+  const bars = useMemo(() => {
+    let h = 7;
+    for (const c of String(song?.$id || "naomi")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return Array.from({ length: BARS }, (_, i) => {
+      h = (h * 1664525 + 1013904223) >>> 0;
+      const r = (h >>> 8) / 16777215;
+      return 14 + Math.round(((Math.abs(Math.sin(i * 0.33)) + r) / 2) * 62);
+    });
+  }, [song?.$id]);
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 26 }}>
-        <div
-          style={{
-            width: 36, height: 36, borderRadius: "50%",
-            background: "linear-gradient(135deg, #ff4d6d 0%, #7c5cff 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 0 0 6px rgba(255,77,109,0.15)",
-          }}
-        >
-          <RadioIcon size={18} color="#fff" />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>Naomi Music Radio</div>
-          <div style={{ fontSize: 12, opacity: 0.6, display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4be88a", display: "inline-block" }} />
-            Live · everyone is listening to the same song
-          </div>
-        </div>
-      </div>
+  const label = { fontSize: 11, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--text-dim)", fontWeight: 700 };
+
+  return (
+    <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px 120px", minHeight: "calc(100vh - 57px)" }}>
+      <style>{`
+        @keyframes nmBar{from{transform:scaleY(.55)}to{transform:scaleY(1)}}
+        @keyframes nmLive{50%{opacity:.35}}
+      `}</style>
+      <audio ref={audioRef} preload="auto" />
 
       {loading && <div style={{ opacity: 0.6, fontSize: 13, textAlign: "center", padding: 40 }}>Tuning in…</div>}
       {error && <div style={{ color: theme.danger, fontSize: 13, textAlign: "center", padding: 40 }}>{error}</div>}
 
-      {song && (
-        <>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-            <img
-              src={fileUrl(song.coverArtField)}
-              alt={song.title}
+      <div style={{ background: "var(--card)", border: `1px solid ${theme.border}`, borderRadius: 22, padding: 22, boxShadow: theme.shadowLg, overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <span style={label}>Naomi Music Studio</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: "#39d98a" }}>
+            <i style={{ width: 8, height: 8, borderRadius: "50%", background: "#39d98a", display: "inline-block", animation: playing ? "nmLive 1.4s infinite" : "none" }} />
+            ON AIR
+          </span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 3, height: 84, marginBottom: 18 }}>
+          {bars.map((h, i) => (
+            <span
+              key={i}
               style={{
-                width: "100%", maxWidth: 320, aspectRatio: "1",
-                objectFit: "cover", borderRadius: 14,
-                boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+                flex: 1,
+                maxWidth: 5,
+                height: h,
+                borderRadius: 2,
+                background: (i / BARS) * 100 < progress ? "var(--accent)" : "var(--border-strong)",
+                transformOrigin: "bottom",
+                animation: playing ? `nmBar ${0.7 + (i % 7) * 0.12}s ease-in-out ${(i % 11) * 0.05}s infinite alternate` : "none",
+                transition: "background .4s",
               }}
             />
-          </div>
+          ))}
+        </div>
 
-          <div style={{ textAlign: "center", marginBottom: 18 }}>
-            <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{song.title}</div>
-            <button
-              onClick={() => navigate(`/artist/${song.uploadedByUserId}`)}
-              style={{
-                background: "none", border: "none", padding: 0,
-                cursor: "pointer", color: theme.accent,
-                fontSize: 15, fontFamily: "inherit",
-              }}
-            >
-              {song.artistName}
-            </button>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button
+            type="button"
+            onClick={toggle}
+            disabled={!song}
+            aria-label={playing ? "Pause radio" : "Play radio"}
+            style={{ width: 54, height: 54, flex: "none", borderRadius: "50%", border: 0, background: "var(--accent-grad)", color: "var(--accent-fg)", cursor: "pointer", display: "grid", placeItems: "center", boxShadow: theme.shadowGlow }}
+          >
+            {playing ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" style={{ marginLeft: 3 }} />}
+          </button>
 
-          <div style={{ width: "100%", maxWidth: 420, margin: "0 auto", padding: "0 20px" }}>
-            <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.12)", position: "relative" }}>
-              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${progress}%`, borderRadius: 2, background: theme.accent }} />
+          {song && (
+            <img
+              src={fileUrl(song.coverArtField)}
+              alt=""
+              style={{ width: 54, height: 54, flex: "none", borderRadius: 12, objectFit: "cover" }}
+            />
+          )}
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {song ? song.title : "Naomi Music Radio"}
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, opacity: 0.55, marginTop: 8 }}>
-              <span>{formatTime(current)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
+            {song ? (
+              <button
+                type="button"
+                onClick={() => navigate(`/artist/${song.uploadedByUserId}`)}
+                style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: theme.accent, fontSize: 13, fontFamily: "inherit" }}
+              >
+                {song.artistName} · Live now
+              </button>
+            ) : (
+              <div style={{ fontSize: 13, color: "var(--text-dim)" }}>Live now</div>
+            )}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 26 }}>
-            <button
-              onClick={toggle}
-              style={{
-                width: 72, height: 72, borderRadius: "50%",
-                background: theme.accent, border: "none",
-                color: "#fff", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 8px 24px rgba(124,92,255,0.45)",
-              }}
-            >
-              {playing ? <Pause size={30} fill="#fff" /> : <Play size={30} fill="#fff" style={{ marginLeft: 4 }} />}
-            </button>
-          </div>
+          <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 13, color: "var(--text-dim)", flex: "none" }}>
+            {duration ? "-" + formatTime(duration - current) : "0:00"}
+          </span>
+        </div>
 
-          <div style={{ textAlign: "center", fontSize: 11.5, opacity: 0.5, marginTop: 22, lineHeight: 1.6 }}>
-            Auto-synced every 4 seconds.
+        <div style={{ height: 3, borderRadius: 2, background: "var(--border-strong)", marginTop: 18, overflow: "hidden" }}>
+          <div style={{ width: `${progress}%`, height: "100%", background: "var(--accent)", transition: "width .5s linear" }} />
+        </div>
+
+        <div style={{ ...label, marginTop: 26, marginBottom: 6 }}>Up next</div>
+        {(upNext.length ? upNext : [null]).map((n, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: `1px solid ${theme.border}` }}>
+            <i style={{ width: 8, height: 8, borderRadius: "50%", flex: "none", background: DOTS[i % DOTS.length] }} />
+            <span style={{ flex: 1, minWidth: 0, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: n ? "var(--text)" : "var(--text-dim)" }}>
+              {n ? n.title || "Untitled" : "Next song is chosen live"}
+            </span>
+            {n && <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{n.artistName}</span>}
           </div>
-        </>
-      )}
+        ))}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 18, fontSize: 11, color: "var(--text-dim)", letterSpacing: 0.8 }}>
+          <button type="button" onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"} style={{ background: "none", border: 0, color: "var(--text-muted)", cursor: "pointer", display: "grid" }}>
+            {muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+          <input
+            type="range" min="0" max="1" step="0.05"
+            value={muted ? 0 : volume}
+            onChange={(e) => { setVolume(Number(e.target.value)); setMuted(false); }}
+            aria-label="Volume"
+            style={{ width: 110, accentColor: "var(--accent)" }}
+          />
+          <span style={{ marginLeft: "auto" }}>LIVE · STEREO{listeners != null ? ` · ${listeners} listening` : ""}</span>
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", fontSize: 11.5, opacity: 0.5, marginTop: 18 }}>
+        Everyone hears the same song at the same moment. Auto-synced every 4 seconds.
+      </div>
     </div>
   );
 }
