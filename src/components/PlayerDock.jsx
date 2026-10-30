@@ -7,8 +7,6 @@ import {
   MessageSquare, Share2, Shuffle, Repeat
 } from "lucide-react";
 import { fileUrl } from "../lib/appwrite";
-import WaveSeek from "./WaveSeek";
-import LyricsScroll from "./LyricsScroll";
 import { RatingsAndComments } from "./RatingsAndComments";
 
 export function PlayerDock({
@@ -25,9 +23,6 @@ export function PlayerDock({
   const audioRef = useRef(null);
   const pagerRef = useRef(null);
   const seekingRef = useRef(false);
-  const lastAutoRef = useRef("");
-  const corsRef = useRef(false);
-  const [cors, setCors] = useState(false);
   const modeRef = useRef({ shuffle: false, repeat: false });
 
   const [activeSlide, setActiveSlide] = useState(1);
@@ -74,10 +69,7 @@ export function PlayerDock({
 
     setIsLoading(true);
     audio.load();
-    if (lastAutoRef.current !== audioUrl) {
-      lastAutoRef.current = audioUrl;
-      audio.play().catch(() => {});
-    }
+    audio.play().catch(() => {});
 
     const handleLoaded = () => {
       setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
@@ -97,7 +89,6 @@ export function PlayerDock({
     const handlePause = () => setIsPlaying(false);
 
     const handleError = () => {
-      if (corsRef.current) { corsRef.current = false; setCors(false); return; }
       setIsLoading(false);
       setIsPlaying(false);
       setAudioError("Audio could not load. Check the file permissions and connection.");
@@ -137,13 +128,6 @@ export function PlayerDock({
       setActiveSlide(1);
     }
   }, [expanded]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (cors || !audio || !audioUrl) return;
-    audio.load();
-    audio.play().catch(() => {});
-  }, [cors]);
 
   const togglePlayback = async () => {
     const audio = audioRef.current;
@@ -222,14 +206,6 @@ export function PlayerDock({
     });
   };
 
-  const seekTo = (value) => {
-    const audio = audioRef.current;
-    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
-    const v = Math.max(0, Math.min(audio.duration, value));
-    audio.currentTime = v;
-    setCurrentTime(v);
-  };
-
   const seek = (event) => {
     const audio = audioRef.current;
     if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
@@ -237,6 +213,14 @@ export function PlayerDock({
     audio.currentTime = value;
     setCurrentTime(value);
   };
+
+  // Tell the rest of the app the mini dock is on screen so pages (e.g. the
+  // messages composer) can leave room for it instead of sitting underneath.
+  useEffect(() => {
+    const docked = !expanded && queue.length > 0;
+    document.body.classList.toggle("has-mini-dock", docked);
+    return () => document.body.classList.remove("has-mini-dock");
+  }, [expanded, queue.length]);
 
   const handleDockClick = (event) => {
     if (expanded) return;
@@ -260,7 +244,6 @@ export function PlayerDock({
         ref={audioRef}
         src={audioUrl || undefined}
         preload="metadata"
-        crossOrigin={cors ? "anonymous" : undefined}
         playsInline
       />
 
@@ -285,10 +268,7 @@ export function PlayerDock({
 
         <button
           className="fs-icon-btn"
-          onClick={() => {
-  setExpanded(false);          // close the player
-  onOpenChat?.(null);          // or just navigate
-}}
+          onClick={() => onOpenChat?.(song)}
           aria-label="Open chat"
           title="Chat"
         >
@@ -350,7 +330,16 @@ export function PlayerDock({
           </div>
 
           <div className="fs-progress">
-            <WaveSeek audioRef={audioRef} duration={duration} currentTime={currentTime} playing={isPlaying} audioUrl={audioUrl} active={expanded} onSeek={seekTo} />
+            <input
+              type="range"
+              min="0"
+              max={duration || 0}
+              step="0.1"
+              value={Math.min(currentTime, duration || 0)}
+              disabled={!audioUrl || !duration}
+              onChange={seek}
+              aria-label="Song progress"
+            />
             <div className="fs-time">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
@@ -424,7 +413,13 @@ export function PlayerDock({
         <div className="fs-slide">
           <div className="fs-slide-content">
             <h2 className="fs-section-title">Lyrics</h2>
-            <LyricsScroll lyrics={song.lyrics} currentTime={currentTime} duration={duration} onSeek={seekTo} />
+            <div className="fs-lyrics-text">
+              {song.lyrics
+                ? song.lyrics.split("\n").map((line, i) => (
+                    <div key={i} style={{ marginBottom: 12 }}>{line}</div>
+                  ))
+                : "No lyrics available for this track."}
+            </div>
           </div>
         </div>
       </div>
