@@ -1,25 +1,40 @@
 import React, { useEffect, useRef } from "react";
 
 const graphs = new WeakMap();
+const tries = new WeakMap();
 
 function getAnalyser(audio) {
-  if (graphs.has(audio)) return graphs.get(audio);
-  let g = null;
+  const g = graphs.get(audio);
+  if (g) return g.ready ? g : null;
+  const act = navigator.userActivation;
+  if (act && !act.hasBeenActive) return null;
+  const n = tries.get(audio) || { count: 0, last: 0 };
+  const now = Date.now();
+  if (n.count >= 5 || now - n.last < 2000) return null;
+  tries.set(audio, { count: n.count + 1, last: now });
+  let ctx;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AC();
+    ctx = new AC();
+  } catch (e) {
+    tries.set(audio, { count: 99, last: now });
+    return null;
+  }
+  graphs.set(audio, { ready: false });
+  ctx.resume().then(() => {
+    if (ctx.state !== "running") throw new Error("suspended");
     const src = ctx.createMediaElementSource(audio);
     const an = ctx.createAnalyser();
     an.fftSize = 256;
     an.smoothingTimeConstant = 0.78;
     src.connect(an);
     an.connect(ctx.destination);
-    g = { ctx, an, data: new Uint8Array(an.frequencyBinCount) };
-  } catch (e) {
-    g = null;
-  }
-  graphs.set(audio, g);
-  return g;
+    graphs.set(audio, { ready: true, ctx, an, data: new Uint8Array(an.frequencyBinCount) });
+  }).catch(() => {
+    try { ctx.close(); } catch (e) {}
+    graphs.delete(audio);
+  });
+  return null;
 }
 
 export default function WaveSeek({ audioRef, duration, currentTime, playing, useAnalyser, active, onSeek }) {
