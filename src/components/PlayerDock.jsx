@@ -24,6 +24,7 @@ export function PlayerDock({
   const audioRef = useRef(null);
   const pagerRef = useRef(null);
   const seekingRef = useRef(false);
+  const lastAutoRef = useRef("");
   const corsRef = useRef(true);
   const [cors, setCors] = useState(true);
   const modeRef = useRef({ shuffle: false, repeat: false });
@@ -72,7 +73,10 @@ export function PlayerDock({
 
     setIsLoading(true);
     audio.load();
-    audio.play().catch(() => {});
+    if (lastAutoRef.current !== audioUrl) {
+      lastAutoRef.current = audioUrl;
+      audio.play().catch(() => {});
+    }
 
     const handleLoaded = () => {
       setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
