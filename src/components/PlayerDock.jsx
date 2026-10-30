@@ -25,8 +25,8 @@ export function PlayerDock({
   const pagerRef = useRef(null);
   const seekingRef = useRef(false);
   const lastAutoRef = useRef("");
-  const corsRef = useRef(true);
-  const [cors, setCors] = useState(true);
+  const corsRef = useRef(false);
+  const [cors, setCors] = useState(false);
   const modeRef = useRef({ shuffle: false, repeat: false });
 
   const [activeSlide, setActiveSlide] = useState(1);
@@ -349,7 +349,7 @@ export function PlayerDock({
           </div>
 
           <div className="fs-progress">
-            <WaveSeek audioRef={audioRef} duration={duration} currentTime={currentTime} playing={isPlaying} useAnalyser={cors} active={expanded} onSeek={seekTo} />
+            <WaveSeek audioRef={audioRef} duration={duration} currentTime={currentTime} playing={isPlaying} audioUrl={audioUrl} active={expanded} onSeek={seekTo} />
             <div className="fs-time">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>

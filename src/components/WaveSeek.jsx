@@ -1,48 +1,66 @@
 import React, { useEffect, useRef } from "react";
 
-const graphs = new WeakMap();
-const tries = new WeakMap();
+const RATE = 25;
+const cache = new Map();
 
-function getAnalyser(audio) {
-  const g = graphs.get(audio);
-  if (g) return g.ready ? g : null;
-  const act = navigator.userActivation;
-  if (act && !act.hasBeenActive) return null;
-  const n = tries.get(audio) || { count: 0, last: 0 };
-  const now = Date.now();
-  if (n.count >= 5 || now - n.last < 2000) return null;
-  tries.set(audio, { count: n.count + 1, last: now });
-  let ctx;
-  try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    ctx = new AC();
-  } catch (e) {
-    tries.set(audio, { count: 99, last: now });
-    return null;
-  }
-  graphs.set(audio, { ready: false });
-  ctx.resume().then(() => {
-    if (ctx.state !== "running") throw new Error("suspended");
-    const src = ctx.createMediaElementSource(audio);
-    const an = ctx.createAnalyser();
-    an.fftSize = 256;
-    an.smoothingTimeConstant = 0.78;
-    src.connect(an);
-    an.connect(ctx.destination);
-    graphs.set(audio, { ready: true, ctx, an, data: new Uint8Array(an.frequencyBinCount) });
-  }).catch(() => {
-    try { ctx.close(); } catch (e) {}
-    graphs.delete(audio);
-  });
-  return null;
+function loadEnvelope(url) {
+  if (cache.has(url)) return cache.get(url);
+  const p = (async () => {
+    const res = await fetch(url, { mode: "cors" });
+    if (!res.ok) throw new Error("fetch failed");
+    const buf = await res.arrayBuffer();
+    const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = new AC(1, 44100, 44100);
+    const audio = await new Promise((ok, no) => ctx.decodeAudioData(buf, ok, no));
+    const ch = audio.getChannelData(0);
+    const step = Math.max(1, Math.floor(audio.sampleRate / RATE));
+    const n = Math.ceil(ch.length / step);
+    const env = new Float32Array(n);
+    let peak = 0.0001;
+    for (let i = 0; i < n; i++) {
+      let sum = 0, cnt = 0;
+      const end = Math.min(ch.length, (i + 1) * step);
+      for (let j = i * step; j < end; j += 8) { sum += ch[j] * ch[j]; cnt++; }
+      env[i] = Math.sqrt(sum / (cnt || 1));
+      if (env[i] > peak) peak = env[i];
+    }
+    for (let i = 0; i < n; i++) env[i] = Math.pow(env[i] / peak, 0.8);
+    return env;
+  })();
+  cache.set(url, p);
+  p.catch(() => cache.delete(url));
+  return p;
 }
 
-export default function WaveSeek({ audioRef, duration, currentTime, playing, useAnalyser, active, onSeek }) {
+export default function WaveSeek({ audioRef, duration, currentTime, playing, audioUrl, active, onSeek }) {
   const cv = useRef(null);
   const drag = useRef(false);
   const live = useRef({});
-  live.current = { duration, currentTime, playing, useAnalyser, onSeek };
-  const lv = useRef(new Float32Array(72));
+  live.current = { duration, playing, onSeek };
+  const envRef = useRef(null);
+  const shape = useRef(null);
+
+  useEffect(() => {
+    envRef.current = null;
+    shape.current = null;
+    if (!active || !audioUrl) return undefined;
+    let off = false;
+    loadEnvelope(audioUrl).then((env) => {
+      if (off) return;
+      const N = 72;
+      const sh = new Float32Array(N);
+      for (let i = 0; i < N; i++) {
+        const a = Math.floor((i / N) * env.length);
+        const b = Math.max(a + 1, Math.floor(((i + 1) / N) * env.length));
+        let m = 0;
+        for (let k = a; k < b; k++) m += env[k];
+        sh[i] = m / (b - a);
+      }
+      shape.current = sh;
+      envRef.current = env;
+    }).catch(() => {});
+    return () => { off = true; };
+  }, [audioUrl, active]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -52,56 +70,44 @@ export default function WaveSeek({ audioRef, duration, currentTime, playing, use
     const N = 72;
     const t0 = performance.now();
     const accent = getComputedStyle(c).getPropertyValue("--pl").trim() || "#c8e84a";
-    let raf = 0;
-    let prog = 0;
+    const lv = new Float32Array(N);
+    let raf = 0, prog = 0, energy = 0.1, phase = 0;
 
     const draw = (now) => {
       raf = requestAnimationFrame(draw);
-      const { duration: d, currentTime: ct, playing: pl, useAnalyser: ua } = live.current;
+      const { duration: d, playing: pl } = live.current;
+      const audio = audioRef.current;
+      const ct = audio ? audio.currentTime || 0 : 0;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = c.clientWidth;
-      const h = c.clientHeight;
+      const w = c.clientWidth, h = c.clientHeight;
       if (!w || !h) return;
-      if (c.width !== Math.round(w * dpr)) {
-        c.width = Math.round(w * dpr);
-        c.height = Math.round(h * dpr);
-      }
+      if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
       g2.setTransform(dpr, 0, 0, dpr, 0, 0);
       g2.clearRect(0, 0, w, h);
       const t = (now - t0) / 1000;
+      const env = envRef.current, sh = shape.current;
 
-      let g = null;
-      const audio = audioRef.current;
-      if (pl && ua && audio) {
-        g = getAnalyser(audio);
-        if (g) {
-          if (g.ctx.state === "suspended") g.ctx.resume().catch(() => {});
-          g.an.getByteFrequencyData(g.data);
-        }
+      let target = 0.08;
+      if (pl) {
+        if (env) target = env[Math.min(env.length - 1, Math.floor(ct * RATE))] || 0;
+        else target = 0.3 + 0.35 * Math.abs(Math.sin(t * 3));
       }
+      energy += (target - energy) * (target > energy ? 0.5 : 0.15);
+      if (pl) phase += 0.1 + energy * 0.2;
 
       const pts = [];
       for (let i = 0; i < N; i++) {
-        let target = 0.06;
-        if (pl) {
-          if (g) {
-            const b = 2 + Math.floor(Math.pow(i / N, 1.5) * 90);
-            target = Math.min(1, Math.pow(g.data[b] / 255, 1.1) * 1.5);
-          } else {
-            target = 0.25 + 0.4 * Math.abs(Math.sin(t * 3.1 + i * 0.45)) * Math.abs(Math.sin(t * 1.7 + i * 0.17));
-          }
-        }
-        lv.current[i] += (target - lv.current[i]) * 0.25;
-        pts.push([(i / (N - 1)) * w, h / 2 + Math.sin(i * 0.6 + t * 4) * lv.current[i] * (h / 2 - 8)]);
+        const base = sh ? 0.2 + 0.8 * sh[i] : 0.5 + 0.5 * Math.sin(i * 0.4);
+        const amp = Math.min(1, base * (0.25 + 1.1 * energy));
+        lv[i] += (amp - lv[i]) * 0.35;
+        pts.push([(i / (N - 1)) * w, h / 2 + Math.sin(i * 0.55 + phase) * lv[i] * (h / 2 - 8)]);
       }
 
       const trace = () => {
         g2.beginPath();
         g2.moveTo(pts[0][0], pts[0][1]);
         for (let i = 1; i < N - 1; i++) {
-          const mx = (pts[i][0] + pts[i + 1][0]) / 2;
-          const my = (pts[i][1] + pts[i + 1][1]) / 2;
-          g2.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+          g2.quadraticCurveTo(pts[i][0], pts[i][1], (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2);
         }
         g2.lineTo(pts[N - 1][0], pts[N - 1][1]);
       };
@@ -109,35 +115,21 @@ export default function WaveSeek({ audioRef, duration, currentTime, playing, use
       const px = d > 0 ? Math.min(w, (ct / d) * w) : 0;
       prog += (px - prog) * 0.4;
 
-      g2.lineWidth = 3;
-      g2.lineCap = "round";
-      g2.lineJoin = "round";
+      g2.lineWidth = 3; g2.lineCap = "round"; g2.lineJoin = "round";
       g2.strokeStyle = "rgba(255,255,255,.28)";
-      trace();
-      g2.stroke();
+      trace(); g2.stroke();
 
       g2.save();
-      g2.beginPath();
-      g2.rect(0, 0, prog, h);
-      g2.clip();
-      g2.strokeStyle = accent;
-      g2.shadowColor = accent;
-      g2.shadowBlur = 14;
-      trace();
-      g2.stroke();
+      g2.beginPath(); g2.rect(0, 0, prog, h); g2.clip();
+      g2.strokeStyle = accent; g2.shadowColor = accent; g2.shadowBlur = 14;
+      trace(); g2.stroke();
       g2.restore();
 
       const k = Math.max(0, Math.min(N - 1, Math.round((prog / w) * (N - 1))));
       g2.beginPath();
       g2.arc(prog, pts[k][1], 6, 0, Math.PI * 2);
-      g2.fillStyle = accent;
-      g2.shadowColor = accent;
-      g2.shadowBlur = 12;
-      g2.fill();
-      g2.shadowBlur = 0;
-      g2.lineWidth = 2;
-      g2.strokeStyle = "#fff";
-      g2.stroke();
+      g2.fillStyle = accent; g2.shadowColor = accent; g2.shadowBlur = 12; g2.fill();
+      g2.shadowBlur = 0; g2.lineWidth = 2; g2.strokeStyle = "#fff"; g2.stroke();
     };
 
     raf = requestAnimationFrame(draw);
