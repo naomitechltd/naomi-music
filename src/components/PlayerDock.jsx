@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { fileUrl } from "../lib/appwrite";
 import WaveSeek from "./WaveSeek";
+import LyricsScroll from "./LyricsScroll";
 import { RatingsAndComments } from "./RatingsAndComments";
 
 export function PlayerDock({
@@ -423,13 +424,7 @@ export function PlayerDock({
         <div className="fs-slide">
           <div className="fs-slide-content">
             <h2 className="fs-section-title">Lyrics</h2>
-            <div className="fs-lyrics-text">
-              {song.lyrics
-                ? song.lyrics.split("\n").map((line, i) => (
-                    <div key={i} style={{ marginBottom: 12 }}>{line}</div>
-                  ))
-                : "No lyrics available for this track."}
-            </div>
+            <LyricsScroll lyrics={song.lyrics} currentTime={currentTime} duration={duration} onSeek={seekTo} />
           </div>
         </div>
       </div>
